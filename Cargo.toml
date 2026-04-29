@@ -1,0 +1,328 @@
+[package]
+name = "win-auto-utils"
+version = "0.1.0"
+edition = "2021"
+description = "Universal Windows automation utilities with memory, window, input, and color operations"
+authors = ["CC"]
+license = "MIT"
+repository = "https://github.com/creayhx/win-auto-utils"
+documentation = "https://docs.rs/win-auto-utils"
+readme = "README.md"
+keywords = ["windows", "automation", "memory", "input", "hook"]
+categories = ["os::windows-apis", "development-tools", "api-bindings"]
+exclude = [
+    ".git/*",
+    ".github/*",
+    "target/*",
+    "docs/*"
+]
+
+[lib]
+name = "win_auto_utils"
+path = "src/lib.rs"
+crate-type = ["rlib"]
+
+[dependencies]
+windows = { version = "0.62", default-features = false, optional = true }
+
+# Optional dependencies for advanced features
+memchr = { version = "2.8", optional = true }
+rayon = { version = "1.12", optional = true }
+# image: Core image processing library (used by template_matcher)
+image = { version = "0.25", default-features = false, optional = true }
+# imageproc: Image processing algorithms including template matching (used by template_matcher)
+imageproc = { version = "0.25", default-features = false, optional = true }
+
+[features]
+
+# Default to standard features (minimal dependencies, fast compilation)
+default = ["standard"]
+
+# === Atomic Functional Modules (Independent) ===
+
+# Process management and handle aggregation
+# Note: This is a high-level module that integrates hwnd/hdc/snapshot/handle functionality.
+# If you only need process enumeration, use the 'snapshot' feature instead.
+process = [
+    "dep:windows",
+    "hwnd",        # For window handle lookup by PID
+    "hdc",         # For DC management (get/release desktop/window DCs)
+    "snapshot",    # For PID lookup by process name
+    "handle",      # For opening/closing process handles
+]
+
+# Window handle querying utilities
+hwnd = [
+    "dep:windows",
+    "windows/Win32_UI_WindowsAndMessaging",
+    "windows/Win32_Foundation",
+]
+
+# Window manipulation and enumeration
+window = [
+    "dep:windows",
+    "utils_chars",                          # Required for string_to_pcwstr
+    "windows/Win32_UI_WindowsAndMessaging",
+    "windows/Win32_Graphics_Gdi",           # Required for some window DC operations
+]
+
+# Process and module enumeration (ToolHelp32 API)
+snapshot = [
+    "dep:windows",
+    "utils_chars",                               # Required for char_array_to_string
+    "windows/Win32_System_Threading",
+    "windows/Win32_System_Diagnostics_ToolHelp",
+]
+
+# Process handle management (OpenProcess, CloseHandle)
+handle = [
+    "dep:windows",
+    "windows/Win32_Foundation",
+    "windows/Win32_System_Threading",
+]
+
+# Device Context (DC) management
+hdc = [
+    "dep:windows",
+    "windows/Win32_Graphics_Gdi",
+    "windows/Win32_UI_WindowsAndMessaging", # For GetDesktopWindow
+]
+
+# Keyboard input
+keyboard = [
+    "dep:windows",
+    "utils_key_code",                          # Only need key_code function, not full utils
+    "utils_thread",                            # For sleep_ms in delay operations
+    "windows/Win32_UI_Input_KeyboardAndMouse",
+    "windows/Win32_UI_WindowsAndMessaging",
+]
+
+# Mouse input
+mouse = [
+    "dep:windows",
+    "utils_thread",                            # For sleep_ms in delay operations
+    "windows/Win32_UI_Input_KeyboardAndMouse",
+    "windows/Win32_UI_WindowsAndMessaging",
+]
+
+# Clipboard operations - Read/write text to system clipboard
+clipboard = [
+    "dep:windows",
+    "windows/Win32_System_DataExchange", # For OpenClipboard, GetClipboardData, SetClipboardData
+    "windows/Win32_System_Memory",       # For GlobalAlloc, GlobalLock, GlobalUnlock
+]
+
+# Memory operations - Read/write process memory
+memory = [
+    "dep:windows",
+    "windows/Win32_Foundation",               # For HANDLE, BOOL types
+    "windows/Win32_System_Diagnostics_Debug", # For ReadProcessMemory, WriteProcessMemory
+    "windows/Win32_System_Threading",         # For OpenProcess, PROCESS_VM_READ/WRITE/OPERATION
+]
+
+# Color picking from screen (requires Windows GDI)
+color_picker = ["dep:windows", "windows/Win32_Graphics_Gdi"]
+
+# Color finding in pixel buffers (pure Rust, zero dependencies)
+# Note: For screen capture integration, enable dxgi feature which is automatically enabled
+color_finder = ["dxgi"]
+
+# === Advanced Modules ===
+# DXGI screen capture using native Windows API (no external dependencies)
+dxgi = [
+    "dep:windows",
+    "windows/Win32_Graphics_Dxgi",
+    "windows/Win32_Graphics_Dxgi_Common",
+    "windows/Win32_Graphics_Direct3D",
+    "windows/Win32_Graphics_Direct3D11",
+    "windows/Win32_Foundation",
+    "windows/Win32_Graphics_Gdi",         # Required for DXGI_OUTPUT_DESC and related types
+]
+
+# DLL injection module - Inject/unload DLLs into remote processes
+# Supports x64 injector → x86/x64 target processes (WOW64 compatible)
+# Use case: Game modding, process instrumentation, debugging
+# Depends on snapshot module for module enumeration
+dll_injector = [
+    "snapshot",                               # Reuse snapshot for module enumeration
+    "dep:windows",
+    "windows/Win32_Foundation",
+    "windows/Win32_System_LibraryLoader",     # GetModuleHandle, GetProcAddress
+    "windows/Win32_System_Memory",            # VirtualAllocEx, WriteProcessMemory
+    "windows/Win32_System_Threading",         # CreateRemoteThread, OpenProcess
+    "windows/Win32_System_Diagnostics_Debug", # WriteProcessMemory
+    "windows/Win32_Security",                 # Required for PROCESS_ACCESS_RIGHTS
+]
+
+# Image template matching with parallel processing support
+# Heavy dependencies: image (~0.25), imageproc (~0.25), rayon
+# Compilation time impact: +30-45s
+# Use case: UI automation, game bot, visual element detection
+template_matcher = [
+    "dxgi",
+    # image: format support + parallel processing
+    "dep:image",
+    "image?/png",
+    "image?/jpeg",
+    "image?/rayon", # ← Enable rayon for image's parallel operations
+    # imageproc: parallel template matching algorithms
+    "dep:imageproc",
+    "imageproc?/rayon", # ← Enable rayon for imageproc's match_template_parallel
+]
+
+# Memory address resolution (symbolic addresses like "game.exe+0x123->456")
+memory_resolver = ["memory", "snapshot"]
+
+# Memory AOB (Array of Bytes) scanning with SIMD acceleration
+memory_aobscan = ["memory", "snapshot", "dep:memchr", "dep:rayon"]
+
+# Memory hooking and manipulation (inline hooks, trampolines, memory locking)
+memory_hook = [
+    "memory",
+    "dep:windows",
+    "windows/Win32_Foundation",
+    "windows/Win32_System_Memory",    # VirtualAllocEx, VirtualProtectEx, VirtualFreeEx
+    "windows/Win32_System_Threading", # For thread operations in memory lock
+]
+
+# Register extractor - Automatic CPU register capture at hook points
+# Provides high-level API for extracting register values without complex pointer chains
+memory_register_extractor = ["memory_hook"]
+
+# === Utility Modules (Pure Rust, No External Dependencies) ===
+# Lightweight utility functions with fine-grained feature control
+
+# Utils sub-module features (fine-grained control)
+utils_key_code = [] # Key code conversion utilities
+utils_chars = []    # Character/string conversion utilities
+utils_thread = []   # Thread utility functions (sleep, etc.)
+
+# Combined feature for backward compatibility (enables all utils)
+utils = ["utils_key_code", "utils_chars", "utils_thread"]
+
+# Script engine - Pure Rust implementation (zero dependencies, cross-platform)
+# This is the core framework only, with no built-in instructions.
+# Can be used for any instruction-based execution system on any platform.
+script_engine = []
+
+# Process context for script engine - Direct field access to Windows handles
+# Provides ~50x faster access to HWND/HDC/HANDLE compared to HashMap lookups
+# Only enable this if your scripts need Windows resource handles
+script_process_context = [
+    "dep:windows",
+    "windows/Win32_Foundation",
+    "windows/Win32_Graphics_Gdi",
+]
+
+# === Scripts Builtin Library (Optional Instruction Sets) ===
+# Each category is independently feature-gated for maximum flexibility.
+
+# Control flow instructions (loop, end, if, else, jump)
+# Useful for any script engine usage, not just Windows automation
+scripts_control_flow = ["script_engine", "scripts_terminator"]
+
+# Script mode configuration instructions (script_mode)
+# Provides mode-based configuration for dynamic behavior switching
+scripts_mode = ["script_engine"]
+
+# Keyboard input instructions (key, key_down, key_up)
+scripts_keyboard = ["script_engine", "keyboard"]
+
+# Mouse input instructions (click, move)
+scripts_mouse = ["script_engine", "mouse"]
+
+# Timing instructions (sleep)
+scripts_timing = ["script_engine", "scripts_terminator", "utils_thread"]
+# Terminator instructions (end)
+scripts_terminator = []
+
+# Window activation instruction (active)
+# Requires process_context for HWND support
+scripts_window = ["script_engine", "script_process_context", "window"]
+
+# Convenience features for keyboard/mouse with PostMessage support
+# These combine the base instruction sets with process_context for background mode
+scripts_keyboard_with_post = ["scripts_keyboard", "script_process_context"]
+scripts_mouse_with_post = ["scripts_mouse", "script_process_context"]
+
+# All built-in instructions (convenience feature)
+# Automatically enables all instruction categories
+scripts_builtin = [
+    "scripts_control_flow",
+    "scripts_mode",
+    "scripts_keyboard",
+    "scripts_mouse",
+    "scripts_timing",
+    "scripts_terminator",
+    "scripts_window",
+]
+
+# === Pre-defined Feature Configurations ===
+
+# Standard feature set - All stable features except heavy dependencies (template_matcher)
+# Only depends on windows crate, minimal dependency footprint (~15s compilation)
+# For full functionality including template matching: cargo build --no-default-features --features "full"
+standard = [
+    # Core Windows API modules
+    "process",
+    "hwnd",
+    "window",
+    "snapshot",
+    "handle",
+    "hdc",
+
+    # Input modules
+    "keyboard",
+    "mouse",
+    "clipboard",
+
+    # Graphics and color modules
+    "dxgi",
+    "color_picker",
+    "color_finder",
+
+    # Memory operations
+    "memory",
+    "memory_resolver",
+    "memory_aobscan",
+    "memory_hook",
+    "memory_register_extractor",
+
+    # DLL injection module
+    "dll_injector",
+
+    # Script engine core
+    "script_engine",
+    "script_process_context",
+
+    # All built-in instruction sets
+    "scripts_builtin",
+
+    # Convenience features for PostMessage support
+    "scripts_keyboard_with_post",
+    "scripts_mouse_with_post",
+
+    # Utility modules
+    "utils",
+]
+
+# Full production mode - ALL features including heavy dependencies (~45-60s compilation)
+full = [
+    "standard",
+    "template_matcher", # ← Heavy dependencies: image/imageproc/rayon (+30-45s)
+]
+
+[[example]]
+name = "dll_injection"
+path = "examples/dll_injection.rs"
+required-features = ["dll_injector", "snapshot"]
+
+[[example]]
+name = "template_matching"
+path = "examples/template_matching.rs"
+required-features = ["template_matcher", "snapshot"]
+
+[[example]]
+name = "template_matching_benchmark"
+path = "examples/template_matching_benchmark.rs"
+required-features = ["template_matcher", "snapshot"]

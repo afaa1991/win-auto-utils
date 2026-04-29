@@ -1,0 +1,9 @@
+//! Pattern module for AOB scanning
+//!
+//! Provides pattern parsing, anchor selection, and related functionality.
+
+mod parser;
+pub(crate) mod anchor;
+
+pub use parser::Pattern;
+// Note: find_rarest_byte_index is used internally by scanner, not exported publicly

@@ -1,0 +1,44 @@
+# Rust
+/target/
+**/*.rs.bk
+Cargo.lock
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Build artifacts
+*.pdb
+*.dll
+*.exe
+*.ps1
+
+# Temporary files and test resources
+tmp/
+
+# Documentation
+target/doc/
+
+# Environment
+.env
+.env.local
+
+# Old client code
+old_client
+
+# Local debug files (not for users)
+examples/_debug_*.rs
+examples/debug_*.rs
+*_test_local.rs
+temp/**
+
+# DLL injection binaries (built executables)
+dll_injection/*.exe

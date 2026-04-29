@@ -1,0 +1,278 @@
+# Win Auto Utils
+
+[中文文档](docs/zh/README.md) | [English Documentation](docs/en/README.md)
+
+A universal Windows automation utility library providing atomic modules for memory operations, window management, input simulation, and color processing. Built with Rust for performance and safety.
+
+## 🚀 Features
+
+### Core Capabilities
+
+- **Process Management**: Process enumeration, handle aggregation, module snapshot (ToolHelp32)
+- **Window Operations**: Window handle queries, enumeration, manipulation, DC management
+- **Input Simulation**: Keyboard input (Key Down/Up/Press), mouse click & movement
+- **Screen Capture**: High-performance DXGI-based capture, GDI color picking
+- **Color Processing**: Pure Rust pixel color finding algorithms (zero dependencies)
+- **Memory Operations**: Read/write process memory, address resolution, AOB scanning
+- **Hooking System**: Inline hooks, trampoline hooks, register extraction
+- **Script Engine**: Pure Rust interpreter with control flow, timing, keyboard/mouse instructions
+- **DLL Injection**: Cross-architecture injection (x64→x86/x64, WOW64 compatible)
+- **Template Matching**: Image-based UI element detection with parallel processing
+
+### Key Advantages
+
+✅ **Atomic Design**: Enable only what you need via feature flags  
+✅ **Minimal Dependencies**: Core features depend only on `windows` crate  
+✅ **Performance**: Release mode with LTO, size optimization, symbol stripping  
+✅ **Safety**: Rust's ownership system prevents common memory errors  
+✅ **Cross-platform Script Engine**: Pure Rust, no external dependencies  
+
+## 📦 Installation
+
+Add to your `Cargo.toml`:
+
+```toml
+[dependencies]
+win-auto-utils = { version = "0.1.0", features = ["standard"] }
+```
+
+For full functionality including template matching:
+
+```toml
+[dependencies]
+win-auto-utils = { version = "0.1.0", features = ["full"] }
+```
+
+## 🎯 Quick Start
+
+### Process Management
+
+```rust
+use win_auto_utils::process::Process;
+
+let process = Process::builder("notepad.exe").build();
+process.init()?;
+println!("PID: {}", process.get_pid());
+```
+
+### Memory Operations
+
+```rust
+use win_auto_utils::memory::{read_memory_t, write_memory_t};
+
+// Read a 32-bit integer
+let value: i32 = read_memory_t(handle, address)?;
+
+// Write a float value
+write_memory_t::<f32>(handle, address, 999.0)?;
+```
+
+### Input Simulation
+
+```rust
+use win_auto_utils::keyboard::key_press;
+use win_auto_utils::mouse::{move_to, left_click};
+
+// Press 'A' key
+key_press(handle, 0x41)?;
+
+// Move mouse and click
+move_to(handle, 100, 200)?;
+left_click(handle)?;
+```
+
+### Screen Capture (DXGI)
+
+```rust
+use win_auto_utils::dxgi::DxgiCapture;
+
+let mut capture = DxgiCapture::new()?;
+let image = capture.capture_window(hwnd)?;
+```
+
+### Memory Hooking
+
+```rust
+use win_auto_utils::memory_hook::TrampolineHook;
+
+let shellcode = vec![0x01, 0xD2]; // add edx, edx
+let mut hook = TrampolineHook::x86(handle, target_addr, shellcode);
+hook.install()?;
+// ... trigger hook ...
+hook.uninstall()?; // Auto-frees memory
+```
+
+### Script Engine
+
+```rust
+use win_auto_utils::script_engine::ScriptEngine;
+
+let script = r#"
+    loop 10
+        key VK_SPACE
+        sleep 100
+    end
+"#;
+
+let mut engine = ScriptEngine::new();
+engine.execute(script)?;
+```
+
+## 📚 Documentation
+
+Comprehensive documentation is available in both English and Chinese:
+
+### Quick Links
+- **[Documentation Index (EN)](docs/en/INDEX.md)** - Complete navigation guide
+- **[文档索引 (中文)](docs/zh/INDEX.md)** - 完整导航指南
+
+### Module Documentation
+
+#### English
+- [Modules Overview](docs/en/modules/overview.md) - High-level view of all modules
+- [Memory Operations](docs/en/modules/memory.md)
+- [Memory Hooking](docs/en/modules/memory_hook.md)
+- [Address Resolution](docs/en/modules/memory_resolver.md)
+- [AOB Scanning](docs/en/modules/memory_aobscan.md)
+- [Script Engine](docs/en/modules/script_engine.md)
+- [Input Control](docs/en/modules/input.md)
+- [Process & Window](docs/en/modules/process_window.md)
+- [Screen Capture](docs/en/modules/dxgi.md)
+- [Template Matching](docs/en/modules/template_matcher.md)
+- [DLL Injection](docs/en/modules/dll_injector.md)
+
+#### Chinese (中文)
+- [模块概览](docs/zh/modules/overview.md) - 所有模块的高层视图
+- [内存操作](docs/zh/modules/memory.md)
+- [内存钩子](docs/zh/modules/memory_hook.md)
+- [地址解析](docs/zh/modules/memory_resolver.md)
+- [字节扫描](docs/zh/modules/memory_aobscan.md)
+- [脚本引擎](docs/zh/modules/script_engine.md)
+- [输入控制](docs/zh/modules/input.md)
+- [进程与窗口](docs/zh/modules/process_window.md)
+- [屏幕捕获](docs/zh/modules/dxgi.md)
+- [模板匹配](docs/zh/modules/template_matcher.md)
+- [DLL注入](docs/zh/modules/dll_injector.md)
+
+## 🏗️ Architecture
+
+The library follows a modular architecture with feature-gated components:
+
+```
+win-auto-utils/
+├── Process & Window Layer
+│   ├── process      - Process management
+│   ├── hwnd         - Handle queries
+│   ├── window       - Window manipulation
+│   └── snapshot     - ToolHelp32 enumeration
+│
+├── Input Layer
+│   ├── keyboard     - Keyboard simulation
+│   └── mouse        - Mouse control
+│
+├── Graphics Layer
+│   ├── dxgi         - Screen capture
+│   ├── color_picker - GDI color picking
+│   └── color_finder - Pixel color search
+│
+├── Memory Layer
+│   ├── memory       - Basic read/write
+│   ├── memory_resolver - Symbolic addresses
+│   ├── memory_aobscan  - Pattern scanning
+│   └── memory_hook     - Inline/trampoline hooks
+│
+├── Advanced Features
+│   ├── dll_injector    - DLL injection
+│   └── template_matcher - Image matching
+│
+└── Script Engine
+    ├── script_engine      - Core interpreter
+    └── scripts_builtin    - Built-in instructions
+```
+
+## 🔧 Feature Flags
+
+Choose only what you need:
+
+### Minimal Setup (~15s compilation)
+```bash
+cargo build --no-default-features --features "keyboard,mouse"
+```
+
+### Core Features (default)
+```bash
+cargo build  # Includes all stable features except template_matcher
+```
+
+### Full Features (~45-60s compilation)
+```bash
+cargo build --no-default-features --features "full"
+```
+
+### Available Features
+
+| Feature | Description | Dependencies |
+|---------|-------------|--------------|
+| `process` | Process management | windows, hwnd, hdc, snapshot, handle |
+| `keyboard` | Keyboard input | windows |
+| `mouse` | Mouse control | windows |
+| `memory` | Memory read/write | windows |
+| `memory_hook` | Hooking system | memory, windows |
+| `memory_aobscan` | Pattern scanning | memory, memchr, rayon |
+| `dxgi` | Screen capture | windows |
+| `template_matcher` | Image matching | image, imageproc, rayon |
+| `script_engine` | Script interpreter | (none, pure Rust) |
+| `dll_injector` | DLL injection | snapshot, windows |
+
+See [Cargo.toml](Cargo.toml) for complete feature list.
+
+## 📖 Examples
+
+Explore the `examples/` directory for usage demonstrations:
+
+```bash
+# Run script engine example
+cargo run --example script_engine --features "script_engine"
+
+# Run DXGI capture example
+cargo run --example dxgi_capture --features "dxgi"
+
+# Run memory hook example
+cargo run --example memory_hook_reset --features "memory_hook"
+
+# Run AOB scan benchmark
+cargo run --example aobscan_benchmark --features "memory_aobscan"
+```
+
+## 🧪 Testing
+
+Run tests for specific modules:
+
+```bash
+# Test script engine
+cargo test --features "script_engine"
+
+# Test built-in instructions
+cargo test --features "scripts_builtin"
+
+# Test memory operations
+cargo test --features "memory"
+```
+
+## 🤝 Contributing
+
+Contributions are welcome! Please feel free to submit a Pull Request.
+
+## 📄 License
+
+This project is licensed under the MIT License - see the LICENSE file for details.
+
+## 🙏 Acknowledgments
+
+- Windows API bindings by [microsoft/windows-rs](https://github.com/microsoft/windows-rs)
+- Template matching algorithms from [image-rs/imageproc](https://github.com/image-rs/imageproc)
+- Community feedback and testing
+
+---
+
+**Language**: [English](README.md) | [中文](docs/zh/README.md)
