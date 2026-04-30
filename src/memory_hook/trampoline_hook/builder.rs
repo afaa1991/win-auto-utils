@@ -45,48 +45,10 @@ use crate::memory::MemoryError;
 use super::{TrampolineHook, HookArchitecture};
 use crate::memory_hook::utils::SendableHandle;
 
-/// Builder for precise TrampolineHook configuration
-/// Validation happens at `build()` time.
+/// Builder for configuring TrampolineHook
 ///
-/// # Example: Build-time specification
-/// ```no_run
-/// use win_auto_utils::memory_hook::TrampolineHook;
-///
-/// let mut hook = TrampolineHook::builder()
-///     .handle(handle)
-///     .target_address(0x41FAF2)
-///     .detour_code(shellcode)
-///     .x86()
-///     .build()?;
-///
-/// hook.install()?;
-/// # Ok::<_, Box<dyn std::error::Error>>(())
-/// ```
-///
-/// For AOBScan workflows and advanced usage, see module-level documentation.
-///
-/// # Example 2: Install-time specification (Deferred binding)
-/// ```no_run
-/// use win_auto_utils::memory_hook::trampoline_hook_builder::TrampolineHookBuilder;
-///
-/// // Step 1: Pre-configure static parameters
-/// let builder = TrampolineHookBuilder::new()
-///     .detour_code(shellcode)
-///     .x86();
-///
-/// // ... perform AOBScan or wait for user action ...
-/// let target_addr = aob_scan(handle, "29 88 FC 02 00 00")?;
-///
-/// // Step 2: Bind dynamic parameters and install
-/// let mut hook = builder.clone()
-///     .handle(handle)
-///     .target_address(target_addr)
-///     .build()?;
-///
-/// hook.install()?;
-/// # Ok::<_, Box<dyn std::error::Error>>(())
-/// ```
-#[derive(Clone)]
+/// Provides a fluent API for building TrampolineHook with optional configuration.
+#[derive(Debug, Clone)]
 pub struct TrampolineHookBuilder {
     handle: Option<HANDLE>,
     target_address: Option<usize>,

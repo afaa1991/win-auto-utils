@@ -2,400 +2,266 @@
 
 [中文文档](../../zh/modules/process_window.md) | [Back to Overview](overview.md)
 
-The `process` module provides comprehensive process and window management with a fluent builder pattern. It supports multiple device context (DC) modes for different screen capture scenarios, lazy initialization for optimal performance, and automatic resource cleanup.
+The `process` module provides comprehensive process and window management with a clean, intuitive API. It supports multiple device context (DC) modes for different screen capture scenarios and automatic resource cleanup.
 
 ## Feature Flag
 
 ```toml
 [dependencies]
-win-auto-utils = { version = "0.1.0", features = ["process"] }
+win-auto-utils = { version = "0.2.0", features = ["process"] }
 ```
 
 ## Quick Start
 
-### Basic Process Management
+### Method 1: One-Step Initialization (Simplest)
 
 ```rust
 use win_auto_utils::process::Process;
 
-// Simple usage with default settings
-let mut process = Process::builder("notepad.exe").build();
+// Initialize by process name - finds first matching process
+let mut process = Process::init_by_name("notepad.exe")?;
+println!("PID: {}", process.pid_or_default());
+println!("HWND: {:?}", process.hwnd_or_default());
+```
+
+### Method 2: Using Builder (Flexible Configuration)
+
+```rust
+use win_auto_utils::process::{Process, ProcessConfig};
+
+// Build configuration with intuitive methods
+let config = ProcessConfig::builder("game.exe")
+    .set_window_client_mode()  // Best for games
+    .exclude_invisible()       // Skip hidden windows
+    .include_by_title("Game Window")  // Filter by title
+    .build();
+
+let mut process = Process::new(config);
+process.init()?;
+```
+
+### Method 3: Initialize by PID (Multi-Instance Support)
+
+```rust
+use win_auto_utils::process::Process;
+
+// When you know the specific PID
+let mut process = Process::init_by_pid(12345)?;
+println!("Connected to PID: {}", process.pid_or_default());
+```
+
+### Method 4: Re-initialize Existing Process
+
+```rust
+use win_auto_utils::process::Process;
+
+// Create without initializing
+let mut process = Process::by_name("app.exe");
+
+// Initialize later
 process.init()?;
 
-println!("PID: {}", process.get_pid());
-println!("Handle: {:?}", process.get_handle());
+// Switch to different instance
+process.init_with_pid(67890)?;
 ```
 
-### Desktop Mode for Full-Screen Capture
+## DC Mode Options
+
+Choose the right DC mode for your use case:
 
 ```rust
-use win_auto_utils::process::{Process, DCMode};
+use win_auto_utils::process::{Process, ProcessConfig};
 
-// Configure for full-screen capture
-let mut game = Process::builder("game.exe")
-    .set_dc_mode(DCMode::Desktop)
+// Option 1: Standard - Full window (title bar + borders)
+let config = ProcessConfig::builder("app.exe")
+    .set_window_mode()
     .build();
 
-game.init()?;
-// Now ready for desktop-level screen capture
+// Option 2: WindowClient - Client area only (recommended for games)
+let config = ProcessConfig::builder("game.exe")
+    .set_window_client_mode()
+    .build();
+
+// Option 3: Desktop - Full desktop capture
+let config = ProcessConfig::builder("fullscreen_game.exe")
+    .set_desktop_mode()
+    .build();
 ```
 
-## Key Features
+## Window Filtering
 
-- **Builder Pattern**: Fluent API for flexible configuration
-- **Multiple DC Modes**: Standard, WindowClient, Desktop
-- **Lazy Initialization**: Resources allocated only when needed
-- **Automatic Cleanup**: RAII via Drop trait
-- **Window Filtering**: Find specific windows by title patterns
-- **Thread-Safe**: Fine-grained locking for concurrent access
-
-## Usage Examples
-
-### Example 1: Process with Window Filtering
+Filter windows by title or visibility:
 
 ```rust
-use win_auto_utils::process::Process;
+use win_auto_utils::process::{Process, ProcessConfig};
 
-// Filter windows by title
-let filters = vec![
-    ("Document".to_string(), 1),  // Must contain "Document"
-    ("Untitled".to_string(), 0),  // Must NOT contain "Untitled"
-];
-
-let mut word = Process::builder("winword.exe")
-    .hwnd_filter(filters)
+// Example 1: Exclude invisible windows
+let config = ProcessConfig::builder("app.exe")
+    .exclude_invisible()
     .build();
 
-word.init()?;
-println!("Found window: {:?}", word.get_hwnd());
+// Example 2: Filter by title pattern (case-insensitive)
+let config = ProcessConfig::builder("chrome.exe")
+    .include_by_title("YouTube")
+    .build();
+
+// Example 3: Exact title match (case-sensitive)
+let config = ProcessConfig::builder("notepad.exe")
+    .include_by_exact_title("document.txt - Notepad")
+    .build();
+
+// Example 4: Combined filters
+let config = ProcessConfig::builder("game.exe")
+    .set_window_client_mode()
+    .exclude_invisible()
+    .include_by_title("Main Window")
+    .build();
+
+let mut process = Process::new(config);
+process.init()?;
 ```
 
-### Example 2: Different DC Modes
+## Process Manager (Multi-Process Management)
+
+Manage multiple processes with a single manager:
 
 ```rust
-use win_auto_utils::process::{Process, DCMode};
+use win_auto_utils::process::{Process, ProcessConfig, ProcessManager};
 
-// Mode 1: Standard - captures entire window (title bar + borders)
-let mut proc1 = Process::builder("app.exe")
-    .set_dc_mode(DCMode::Standard)
-    .build();
+let mut manager = ProcessManager::new();
 
-// Mode 2: WindowClient - captures only client area (content)
-let mut proc2 = Process::builder("app.exe")
-    .set_dc_mode(DCMode::WindowClient)
-    .build();
+// Register processes
+manager.register("notepad.exe")?;
+manager.register_alias("game", "target.exe")?;
 
-// Mode 3: Desktop - captures full desktop (for fullscreen games)
-let mut proc3 = Process::builder("game.exe")
-    .desktop_mode()  // Shorthand for set_dc_mode(DCMode::Desktop)
-    .build();
+// Initialize with different strategies
+manager.init("notepad.exe")?;
+manager.init_with_pid("game", 12345)?;
 
-proc1.init()?;
-proc2.init()?;
-proc3.init()?;
+// Query processes (read-only, no mut needed)
+if let Some(proc) = manager.get("notepad.exe") {
+    println!("PID: {:?}", proc.pid());
+}
+
+// List all managed processes
+for (name, proc) in manager.list_processes() {
+    println!("{}: PID={:?}", name, proc.pid());
+}
 ```
 
-### Example 3: Convenience Methods
+## Error Handling
 
-```rust
-use win_auto_utils::process::Process;
-
-// Use convenience methods for common configurations
-let game = Process::builder("fullscreen_game.exe")
-    .desktop_mode()  // Same as .set_dc_mode(DCMode::Desktop)
-    .build();
-
-let app = Process::builder("windowed_app.exe")
-    .window_client_mode()  // Same as .set_dc_mode(DCMode::WindowClient)
-    .build();
-```
-
-### Example 4: Error Handling
+Handle common errors gracefully:
 
 ```rust
 use win_auto_utils::process::{Process, ProcessError};
 
-match Process::builder("nonexistent.exe").build().init() {
-    Ok(_) => println!("Process initialized"),
+match Process::init_by_name("nonexistent.exe") {
+    Ok(mut process) => {
+        println!("Process initialized: PID={}", process.pid_or_default());
+    }
     Err(ProcessError::ProcessNotFound(name)) => {
         eprintln!("Process '{}' not found", name);
     }
-    Err(ProcessError::HandleOpenFailed(pid)) => {
-        eprintln!("Failed to open handle for PID {}", pid);
+    Err(ProcessError::WindowNotFound(pid)) => {
+        eprintln!("No window found for PID {}", pid);
     }
-    Err(e) => eprintln!("Error: {}", e),
+    Err(e) => {
+        eprintln!("Initialization failed: {}", e);
+    }
 }
 ```
 
-### Example 5: Accessing Process Information
+## Complete Examples
+
+### Example 1: Game Automation Setup
+
+```rust
+use win_auto_utils::process::{Process, ProcessConfig};
+
+// Configure for game capture
+let config = ProcessConfig::builder("target.exe")
+    .set_window_client_mode()  // Client area only
+    .exclude_invisible()       // Skip minimized windows
+    .include_by_title("Game")  // Ensure correct window
+    .build();
+
+let mut game = Process::new(config);
+game.init()?;
+
+println!("Game PID: {}", game.pid_or_default());
+println!("Game HWND: {:?}", game.hwnd_or_default());
+```
+
+### Example 2: Multi-Instance Application
+
+```rust
+use win_auto_utils::process::Process;
+use win_auto_utils::snapshot::find_pids_by_name;
+
+// Find all instances
+let pids = find_pids_by_name("notepad.exe");
+println!("Found {} Notepad instances", pids.len());
+
+// Connect to each instance
+for pid in pids {
+    let mut process = Process::init_by_pid(pid)?;
+    println!("  PID {}: HWND={:?}", pid, process.hwnd_or_default());
+}
+```
+
+### Example 3: Dynamic Process Switching
 
 ```rust
 use win_auto_utils::process::Process;
 
-let mut process = Process::builder("chrome.exe").build();
+let mut app = Process::by_name("target.exe");
+
+// Initialize first instance
+app.init()?;
+println!("First instance: PID={}", app.pid_or_default());
+
+// Later, switch to another instance
+app.init_with_pid(67890)?;
+println!("Switched to: PID={}", app.pid_or_default());
+```
+
+## Key Features
+
+✅ **Intuitive API** - No enums to remember, method names are self-explanatory  
+✅ **Multiple Initialization Methods** - Choose what fits your use case  
+✅ **Smart Window Filtering** - Find exact windows by title or visibility  
+✅ **Multi-Process Support** - Manage multiple instances easily  
+✅ **Automatic Resource Cleanup** - RAII via Drop trait  
+✅ **Performance Optimized** - Lazy initialization, minimal overhead  
+
+## Migration Guide (v0.1.x → v0.2.0)
+
+### Old API (v0.1.x)
+```rust
+// ❌ Don't do this anymore
+let mut process = Process::new("app.exe");
+process.dc_mode = DCMode::WindowClient;
+process.hwnd_filter = Some(filters);
 process.init()?;
-
-// Get process information
-let pid = process.get_pid();
-let handle = process.get_handle();
-let hwnd = process.get_hwnd();
-let dc = process.get_dc();
-
-println!("PID: {}", pid);
-println!("Window Handle: {:?}", hwnd);
-println!("Device Context: {:?}", dc);
 ```
 
-### Example 6: Multiple Processes
-
+### New API (v0.2.0)
 ```rust
-use win_auto_utils::process::Process;
+// ✅ Use this instead
+let config = ProcessConfig::builder("app.exe")
+    .set_window_client_mode()
+    .exclude_invisible()
+    .include_by_title("App Window")
+    .build();
 
-// Manage multiple processes
-let mut notepad = Process::builder("notepad.exe").build();
-let mut calc = Process::builder("calc.exe").build();
-
-notepad.init()?;
-calc.init()?;
-
-println!("Notepad PID: {}", notepad.get_pid());
-println!("Calculator PID: {}", calc.get_pid());
-
-// Resources automatically cleaned up when dropped
-```
-
-## API Reference
-
-### Main Types
-
-#### Process
-
-The main struct for managing processes and windows.
-
-**Constructor**:
-- `Process::builder(name: &str) -> ProcessBuilder` - Create builder for configuration
-
-**Methods**:
-- `init(&mut self) -> ProcessResult<()>` - Initialize process (lazy)
-- `get_pid(&self) -> u32` - Get process ID
-- `get_handle(&self) -> HANDLE` - Get process handle
-- `get_hwnd(&self) -> HWND` - Get window handle
-- `get_dc(&self) -> HDC` - Get device context
-- `get_dc_mode(&self) -> DCMode` - Get current DC mode
-
-#### ProcessBuilder
-
-Fluent builder for configuring Process instances.
-
-**Constructor**:
-- `Process::builder(name: &str)` - Start building a process
-
-**Configuration Methods**:
-- `set_dc_mode(mode: DCMode) -> Self` - Set DC acquisition mode
-- `set_dc_mode_num(value: u8) -> Self` - Set DC mode by number (1/2/3)
-- `try_set_dc_mode_num(value: u8) -> Result<Self, Self>` - Fallible version
-- `desktop_mode() -> Self` - Shorthand for Desktop DC mode
-- `window_client_mode() -> Self` - Shorthand for WindowClient DC mode
-- `standard_mode() -> Self` - Shorthand for Standard DC mode
-- `hwnd_filter(filters: HwndFilter) -> Self` - Set window title filters
-- `build() -> Process` - Build configured Process instance
-
-#### DCMode
-
-Device Context acquisition mode enum.
-
-**Variants**:
-- `DCMode::Standard` (value: 1) - Full window including title bar/borders
-- `DCMode::WindowClient` (value: 2) - Client area only (content)
-- `DCMode::Desktop` (value: 3) - Full desktop capture
-
-**Methods**:
-- `as_u8(&self) -> u8` - Convert to numeric value
-- `from_u8(value: u8) -> Option<DCMode>` - Create from numeric value
-
-#### ProcessError
-
-Error types for process operations.
-
-**Variants**:
-- `ProcessNotFound(String)` - Process not found by name
-- `HandleOpenFailed(u32)` - Failed to open process handle
-- `WindowNotFound(u32)` - No window found for PID
-- `DCNotFound(HWND)` - Failed to get device context
-- `InvalidDCMode(u8)` - Invalid DC mode value
-
-### Type Aliases
-
-- `HwndFilter` - `Vec<(String, u8)>` - Window title filter
-  - `String`: Pattern to match
-  - `u8`: Filter mask (1 = must contain, 0 = must NOT contain)
-
-- `ProcessResult<T>` - `Result<T, ProcessError>` - Result type for operations
-
-## DC Mode Comparison
-
-| Mode | Captures | Use Case | Method |
-|------|----------|----------|--------|
-| **Standard** | Full window (title + borders + content) | General windowed apps | `.standard_mode()` |
-| **WindowClient** | Client area only (content) | App content without chrome | `.window_client_mode()` |
-| **Desktop** | Entire desktop | Fullscreen games, overlays | `.desktop_mode()` |
-
-### Visual Comparison
-
-```
-Standard Mode:
-┌─────────────────────┐
-│  Title Bar          │  ← Included
-├─────────────────────┤
-│                     │
-│   Content Area      │  ← Included
-│                     │
-└─────────────────────┘
-
-WindowClient Mode:
-┌─────────────────────┐
-│  Title Bar          │  ← Excluded
-├─────────────────────┤
-│                     │
-│   Content Area      │  ← Captured
-│                     │
-└─────────────────────┘
-
-Desktop Mode:
-┌───────────────────────────┐
-│  Entire Desktop Screen    │  ← Captured
-│  (all windows combined)   │
-└───────────────────────────┘
-```
-
-## Best Practices
-
-1. **Use Builder Pattern for Clarity**
-   ```rust
-   // Clear and explicit
-   let process = Process::builder("game.exe")
-       .desktop_mode()
-       .build();
-   
-   // vs manual configuration
-   let mut process = Process::new("game.exe");
-   process.set_dc_mode(DCMode::Desktop);
-   ```
-
-2. **Initialize Only When Needed**
-   ```rust
-   let mut process = Process::builder("app.exe").build();
-   
-   // Configuration happens here (no resources allocated)
-   
-   process.init()?;  // Resources allocated now
-   
-   // Use process...
-   ```
-
-3. **Choose Correct DC Mode**
-   ```rust
-   // For windowed applications
-   let app = Process::builder("notepad.exe")
-       .window_client_mode()
-       .build();
-   
-   // For fullscreen games
-   let game = Process::builder("game.exe")
-       .desktop_mode()
-       .build();
-   ```
-
-4. **Handle Errors Gracefully**
-   ```rust
-   match process.init() {
-       Ok(_) => use_process(&process),
-       Err(e) => log_error(e),
-   }
-   ```
-
-5. **Let RAII Handle Cleanup**
-   ```rust
-   {
-       let mut process = Process::builder("app.exe").build();
-       process.init()?;
-       // Use process...
-   }  // Automatically cleaned up here
-   ```
-
-## Common Pitfalls
-
-### ❌ Forgetting to Call init()
-
-```rust
-// Wrong: Process not initialized
-let process = Process::builder("app.exe").build();
-let pid = process.get_pid();  // Returns 0 or invalid!
-
-// Correct: Always initialize first
-let mut process = Process::builder("app.exe").build();
+let mut process = Process::new(config);
 process.init()?;
-let pid = process.get_pid();  // Valid PID
 ```
 
-### ❌ Using Wrong DC Mode
-
-```rust
-// Wrong: Standard mode for fullscreen game
-let game = Process::builder("game.exe")
-    .standard_mode()  // Won't capture properly!
-    .build();
-
-// Correct: Desktop mode for fullscreen
-let game = Process::builder("game.exe")
-    .desktop_mode()
-    .build();
-```
-
-### ❌ Not Checking Window Filters
-
-```rust
-// Wrong: Assuming window will be found
-let filters = vec![("Specific Title".to_string(), 1)];
-let process = Process::builder("app.exe")
-    .hwnd_filter(filters)
-    .build();
-process.init()?;  // May fail if no matching window
-
-// Correct: Check result
-match process.init() {
-    Ok(_) => println!("Window found"),
-    Err(ProcessError::WindowNotFound(_)) => {
-        eprintln!("No window matching filter");
-    }
-    Err(e) => eprintln!("Error: {}", e),
-}
-```
-
-## Performance Considerations
-
-- **Lazy Initialization**: Zero overhead until `init()` called
-- **Resource Caching**: DC and handles cached after first access
-- **Batch Operations**: Initialize multiple processes together when possible
-- **DC Mode Impact**: Desktop mode slightly slower than window-specific modes
-
-### Initialization Time
-
-| Operation | Typical Time |
-|-----------|--------------|
-| Builder creation | < 1μs |
-| Process lookup | 1-5ms |
-| Handle opening | 1-2ms |
-| DC acquisition | 1-3ms |
-| Total init() | 3-10ms |
-
-## Related Modules
-
-- [`hwnd`](process_window.md): Window handle utilities
-- [`snapshot`](process_window.md): Process/module enumeration
-- [`dxgi`](dxgi.md): Advanced screen capture
-- [`memory`](memory.md): Read/write process memory
-
----
-
-**Language**: [English](process_window.md) | [中文](../../zh/modules/process_window.md)
+### Key Changes
+1. **Configuration is immutable** - Use `ProcessConfig` builder
+2. **No direct field access** - All configuration through builder
+3. **Intuitive method names** - `.set_window_client_mode()` instead of `.dc_mode(DCMode::WindowClient)`
+4. **Better error handling** - More specific error types
+5. **Simplified imports** - Only need `Process`, `ProcessConfig`, `ProcessManager`

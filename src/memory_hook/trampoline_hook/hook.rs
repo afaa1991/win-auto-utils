@@ -39,7 +39,7 @@ pub enum HookArchitecture {
 /// hook.uninstall()?; // Auto-frees everything
 /// ```
 ///
-/// For advanced scenarios (custom memory addresses, pre-backed-up bytes), use [`crate::memory_hook::TrampolineHookBuilder`].
+/// For advanced scenarios (custom memory addresses, pre-backed-up bytes), use [`TrampolineHook::builder()`].
 
 pub struct TrampolineHook {
     pub handle: SendableHandle,
@@ -107,8 +107,6 @@ impl TrampolineHook {
     /// hook.install()?;
     /// # Ok::<_, Box<dyn std::error::Error>>(())
     /// ```
-    ///
-    /// For AOBScan workflows, see [`crate::memory_hook::TrampolineHookBuilder`] documentation.
     pub fn builder() -> crate::memory_hook::trampoline_hook::builder::TrampolineHookBuilder {
         crate::memory_hook::trampoline_hook::builder::TrampolineHookBuilder::new()
     }

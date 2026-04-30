@@ -90,7 +90,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         }
     };
 
-    println!("✓ Connected to {} (PID: {})\n", target_process, process.get_pid());
+    println!("✓ Connected to {} (PID: {})\n", target_process, process.pid_or_default());
 
     // Test 1: Full complex pattern scan
     let test1_results = benchmark_full_pattern(&process)?;
@@ -119,7 +119,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
 /// Helper: Initialize process connection
 fn initialize_process(name: &str) -> Result<Option<Process>, Box<dyn std::error::Error>> {
-    let process = Process::builder(name).build();
+    let mut process = Process::by_name(name);
     
     match process.init() {
         Ok(()) => Ok(Some(process)),
@@ -135,7 +135,7 @@ fn benchmark_full_pattern(process: &Process) -> Result<Vec<BenchmarkResult>, Box
     println!("[Test 1] Full Complex Pattern Scan - Detailed Results");
     println!("====================================================");
 
-    let handle = process.get_handle();
+    let handle = process.handle().unwrap();
     
     // The complete bytecode pattern from user request
     let pattern_str = "48 81 C2 00 01 00 00 49 81 E8 00 01 00 00 49 81 F8 00 01 00 00 0F 83 78 FF FF FF 4D 8D 48 1F 49 83 E1 E0 4D 8B D9 49 C1 EB 05 47 8B 9C 9A D0 2F E2 01 4D 03 DA 41 FF E3 C4 A1 7E 6F 8C 0A 00 FF FF FF C4 A1 7E 7F 8C 09 00 FF FF FF C4 A1 7E 6F 8C 0A 20 FF FF FF C4 A1 7E 7F 8C 09 20 FF FF FF C4 A1 7E 6F 8C 0A 40 FF FF FF";
@@ -263,7 +263,7 @@ fn benchmark_pattern_segments(process: &Process) -> Result<Vec<BenchmarkResult>,
     println!("[Test 2] Pattern Segments Performance");
     println!("======================================");
 
-    let handle = process.get_handle();
+    let handle = process.handle().unwrap();
     
     // Break down the pattern into segments
     let segments = vec![
@@ -335,7 +335,7 @@ fn benchmark_range_sizes(process: &Process) -> Result<Vec<BenchmarkResult>, Box<
     println!("[Test 3] Range Size Impact on Performance");
     println!("==========================================");
 
-    let handle = process.get_handle();
+    let handle = process.handle().unwrap();
     
     // Use a medium-length segment for this test
     let pattern_str = "48 81 C2 00 01 00 00 49 81 E8 00 01 00 00 49 81 F8 00 01 00 00";
@@ -398,7 +398,7 @@ fn benchmark_early_exit_vs_find_all(process: &Process) -> Result<Vec<BenchmarkRe
     println!("[Test 4] Early Exit vs Find All Comparison");
     println!("===========================================");
 
-    let handle = process.get_handle();
+    let handle = process.handle_or_default();
     
     let pattern_str = "48 81 C2 00 01 00 00";
     let start_addr = 0x7FF000000000usize;

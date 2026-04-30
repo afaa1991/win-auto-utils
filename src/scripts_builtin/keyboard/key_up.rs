@@ -3,9 +3,9 @@
 //! Implements the `key_up` instruction for releasing keyboard keys.
 
 use super::KeyParams;
-use crate::keyboard::send_input;
+use crate::keyboard::keyboard_input;
 #[cfg(feature = "script_process_context")]
-use crate::keyboard::post_message;
+use crate::keyboard::keyboard_message;
 use crate::script_engine::instruction::{
     InstructionData, InstructionHandler, InstructionMetadata, ScriptError,
 };
@@ -36,7 +36,7 @@ impl InstructionHandler for KeyUpHandler {
 
         // Pre-build KEYUP INPUT at parse time (zero runtime overhead)
         if params.mode == KeyMode::Send {
-            params.send_inputs = vec![send_input::build_key_up_input(
+            params.send_inputs = vec![keyboard_input::build_key_up_input(
                 params.vk_code,
                 params.extended,
             )];
@@ -70,7 +70,7 @@ impl InstructionHandler for KeyUpHandler {
                 // Use pre-built KEYUP INPUT (zero runtime allocation)
                 // Note: SendInput mode does NOT require target_hwnd
                 if params.send_inputs.len() >= 1 {
-                    send_input::execute_single_input(&params.send_inputs[0]).map_err(|e| {
+                    keyboard_input::execute_single_input(&params.send_inputs[0]).map_err(|e| {
                         ScriptError::ExecutionError(format!("SendInput release failed: {:?}", e))
                     })?;
                 } else {
@@ -83,7 +83,7 @@ impl InstructionHandler for KeyUpHandler {
                 #[cfg(feature = "script_process_context")]
                 {
                     // PostMessage mode requires target window handle
-                    post_message::post_key_up_atomic(
+                    keyboard_message::post_key_up_atomic(
                         vm.process.get_hwnd_or_err()?,
                         params.vk_code,
                         params.scan_code,

@@ -12,19 +12,19 @@
 //! kb.click("a").unwrap();
 //! ```
 
-pub mod post_message;
-pub mod send_input;
+pub mod keyboard_message;
+pub mod keyboard_input;
 
 // Re-export main types for convenience
-pub use post_message::{PostMessageKeyboard, PostMessageError};
-pub use send_input::{SendInputKeyboard, SendInputError};
+pub use keyboard_message::{PostMessageKeyboard, PostMessageKeyBoardError};
+pub use keyboard_input::{SendInputKeyboard, SendKeyBoardInputError};
 
 // Re-export atomic high-performance functions
-pub use post_message::{
+pub use keyboard_message::{
     post_key_down_atomic, post_key_up_atomic, post_key_click_atomic,
 };
 
-pub use send_input::{
+pub use keyboard_input::{
     execute_inputs as send_execute_inputs,
     execute_single_input as send_execute_single_input,
     build_keybd_input, build_key_click_inputs, build_key_down_input, build_key_up_input,

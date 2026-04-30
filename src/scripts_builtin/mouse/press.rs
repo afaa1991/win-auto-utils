@@ -3,7 +3,7 @@
 //! Implements the `press` instruction for pressing and holding the left mouse button.
 
 use super::{parse_mouse_mode, MouseMode, PressParams};
-use crate::mouse::send_input;
+use crate::mouse::mouse_input;
 use crate::script_engine::instruction::{
     InstructionData, InstructionHandler, InstructionMetadata, ScriptError,
 };
@@ -74,7 +74,7 @@ impl InstructionHandler for PressHandler {
         // OPTIMIZATION: Pre-build ACTION-ONLY INPUT at parse time
         // Strategy: SetCursorPos (execute) + pre-built action (parse)
         let send_inputs = if mode == MouseMode::Send {
-            vec![send_input::build_press_left()]
+            vec![mouse_input::build_press_left()]
         } else {
             vec![]
         };
@@ -132,18 +132,18 @@ impl InstructionHandler for PressHandler {
                 // OPTIMIZATION: Use SetCursorPos for movement + pre-built press for execution
                 if let Some((screen_x, screen_y)) = screen_coords {
                     // Step 1: Fast cursor positioning using SetCursorPos (~2.2 μs)
-                    send_input::set_cursor_pos(screen_x, screen_y).map_err(|e| {
+                    mouse_input::set_cursor_pos(screen_x, screen_y).map_err(|e| {
                         ScriptError::ExecutionError(format!("SetCursorPos failed: {:?}", e))
                     })?;
 
                     // Step 2: Execute press at current position
-                    let inputs = vec![send_input::build_press_left()];
-                    send_input::execute_inputs(&inputs).map_err(|e| {
+                    let inputs = vec![mouse_input::build_press_left()];
+                    mouse_input::execute_inputs(&inputs).map_err(|e| {
                         ScriptError::ExecutionError(format!("Press failed: {:?}", e))
                     })?;
                 } else {
                     // No coordinates provided, just press at current position using pre-built inputs
-                    send_input::execute_inputs(&params.send_inputs).map_err(|e| {
+                    mouse_input::execute_inputs(&params.send_inputs).map_err(|e| {
                         ScriptError::ExecutionError(format!("Press failed: {:?}", e))
                     })?;
                 }
@@ -151,7 +151,7 @@ impl InstructionHandler for PressHandler {
             MouseMode::Post => {
                 #[cfg(feature = "script_process_context")]
                 {
-                    use crate::mouse::post_message;
+                    use crate::mouse::mouse_message;
 
                     // Use provided coordinates or default to (0, 0)
                     let window_x = params.x.unwrap_or(0);
@@ -159,7 +159,7 @@ impl InstructionHandler for PressHandler {
                     // Convert window coordinates to client coordinates for PostMessage
                     let (client_x, client_y) =
                         super::convert_to_client_coords(vm, window_x, window_y)?;
-                    post_message::post_press_left_atomic(
+                    mouse_message::post_press_left_atomic(
                         vm.process.get_hwnd_or_err()?,
                         client_x,
                         client_y,

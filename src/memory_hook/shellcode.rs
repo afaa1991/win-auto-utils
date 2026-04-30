@@ -225,7 +225,7 @@ impl ShellcodeBuilder {
         self
     }
 
-    /// MOV \[absolute_address\], register (32-bit)
+    /// MOV [absolute_address], register (32-bit)
     ///
     /// Stores a 32-bit register value to an absolute memory address.
     /// This method automatically handles both x86 and x64 architectures correctly.

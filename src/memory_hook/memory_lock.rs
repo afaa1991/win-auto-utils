@@ -2,13 +2,16 @@
 //!
 //! Provides functionality to continuously monitor and restore memory values.
 
-use std::sync::{Arc, atomic::{AtomicBool, Ordering}};
+use super::utils::SendableHandle;
+use crate::memory::{read_memory_bytes, write_memory_bytes, MemoryError};
+use crate::memory_resolver::MemoryAddress;
+use std::sync::{
+    atomic::{AtomicBool, Ordering},
+    Arc,
+};
 use std::thread;
 use std::time::Duration;
 use windows::Win32::Foundation::HANDLE;
-use crate::memory::{read_memory_bytes, write_memory_bytes, MemoryError};
-use crate::memory_resolver::MemoryAddress;
-use super::utils::SendableHandle;
 
 /// Source of the target address for locking
 #[derive(Clone)]
@@ -28,10 +31,9 @@ impl AddressSource {
         match self {
             AddressSource::Static(addr) => Ok(*addr),
             AddressSource::Dynamic(mem_addr) => {
-                mem_addr.resolve_address(handle, pid)
-                    .map_err(|e| MemoryError::ReadFailed(
-                        format!("Failed to resolve dynamic address: {}", e)
-                    ))
+                mem_addr.resolve_address(handle, pid).map_err(|e| {
+                    MemoryError::ReadFailed(format!("Failed to resolve dynamic address: {}", e))
+                })
             }
         }
     }
@@ -79,7 +81,7 @@ impl MemoryLock {
     pub fn set_scan_interval(&mut self, interval: Duration) {
         self.scan_interval = interval;
     }
-    
+
     /// Lock a specific value at the target address
     ///
     /// # Arguments
@@ -100,47 +102,50 @@ impl MemoryLock {
     pub fn lock_value<T: Copy + AsBytes>(&mut self, value: T) -> Result<(), MemoryError> {
         // Validate required parameters
         let handle = self.handle.as_ref().ok_or_else(|| {
-            MemoryError::WriteFailed("handle must be set. Call .handle(handle) before lock_value().".to_string())
+            MemoryError::WriteFailed(
+                "handle must be set. Call .handle(handle) before lock_value().".to_string(),
+            )
         })?;
-        
+
         let address_source = self.address_source.as_ref().ok_or_else(|| {
             MemoryError::WriteFailed("address must be set. Call .address(addr) or .address_from_resolver(addr) before lock_value().".to_string())
         })?;
-        
+
         let pid = self.pid.ok_or_else(|| {
-            MemoryError::WriteFailed("PID must be set for address resolution. Call .pid(pid) before lock_value().".to_string())
+            MemoryError::WriteFailed(
+                "PID must be set for address resolution. Call .pid(pid) before lock_value()."
+                    .to_string(),
+            )
         })?;
-        
+
         // Resolve the actual address (tolerate errors if configured)
         let address = match address_source.resolve(handle.0, pid) {
             Ok(addr) => addr,
-            Err(e) => {
+            Err(_) => {
                 // For dynamic addresses, we can tolerate initial resolution failure
                 // The background thread will retry on each cycle
-                #[cfg(debug_assertions)]
-                println!("[MemoryLock] ⚠ Initial address resolution failed ({}), background thread will retry", e);
-                
+
                 // Start monitoring anyway - the thread will handle retries
                 let bytes = value.as_bytes();
                 self.size = bytes.len();
                 self.locked_value = bytes.to_vec();
-                return self.start_monitoring(0);  // Use dummy address, thread will re-resolve
+                return self.start_monitoring(0); // Use dummy address, thread will re-resolve
             }
         };
-        
+
         let bytes = value.as_bytes();
         self.size = bytes.len();
         self.locked_value = bytes.to_vec();
-        
+
         // Write the initial value
         write_memory_bytes(handle.0, address, &self.locked_value)?;
-        
+
         // Start the monitoring thread
         self.start_monitoring(address)?;
-        
+
         Ok(())
     }
-    
+
     /// Lock raw bytes at the target address
     ///
     /// # Arguments
@@ -148,59 +153,62 @@ impl MemoryLock {
     pub fn lock_bytes(&mut self, bytes: &[u8]) -> Result<(), MemoryError> {
         // Validate required parameters
         let handle = self.handle.as_ref().ok_or_else(|| {
-            MemoryError::WriteFailed("handle must be set. Call .handle(handle) before lock_bytes().".to_string())
+            MemoryError::WriteFailed(
+                "handle must be set. Call .handle(handle) before lock_bytes().".to_string(),
+            )
         })?;
-        
+
         let address_source = self.address_source.as_ref().ok_or_else(|| {
             MemoryError::WriteFailed("address must be set. Call .address(addr) or .address_from_resolver(addr) before lock_bytes().".to_string())
         })?;
-        
+
         let pid = self.pid.ok_or_else(|| {
-            MemoryError::WriteFailed("PID must be set for address resolution. Call .pid(pid) before lock_bytes().".to_string())
+            MemoryError::WriteFailed(
+                "PID must be set for address resolution. Call .pid(pid) before lock_bytes()."
+                    .to_string(),
+            )
         })?;
-        
+
         // Resolve the actual address (tolerate errors if configured)
         let address = match address_source.resolve(handle.0, pid) {
             Ok(addr) => addr,
-            Err(e) => {
+            Err(_) => {
                 // For dynamic addresses, we can tolerate initial resolution failure
                 // The background thread will retry on each cycle
-                #[cfg(debug_assertions)]
-                println!("[MemoryLock] ⚠ Initial address resolution failed ({}), background thread will retry", e);
-                
                 // Start monitoring anyway - the thread will handle retries
                 self.size = bytes.len();
                 self.locked_value = bytes.to_vec();
-                return self.start_monitoring(0);  // Use dummy address, thread will re-resolve
+                return self.start_monitoring(0); // Use dummy address, thread will re-resolve
             }
         };
-        
+
         self.size = bytes.len();
         self.locked_value = bytes.to_vec();
-        
+
         // Write the initial value
         write_memory_bytes(handle.0, address, &self.locked_value)?;
-        
+
         // Start the monitoring thread
         self.start_monitoring(address)?;
-        
+
         Ok(())
     }
-    
+
     /// Stop locking and restore normal operation
     pub fn unlock(&mut self) -> Result<(), MemoryError> {
         if let Some(thread) = self.worker_thread.take() {
             // Signal the thread to stop
             self.stop_flag.store(true, Ordering::Relaxed);
-            
+
             // Wait for the thread to finish
             if let Err(e) = thread.join() {
-                return Err(MemoryError::ReadFailed(
-                    format!("Failed to join worker thread: {:?}", e)
-                ));
+                return Err(MemoryError::ReadFailed(format!(
+                    "Failed to join worker thread: {:?}",
+                    e
+                )));
             }
         }
-        
+
         Ok(())
     }
 
@@ -270,31 +278,31 @@ impl MemoryLock {
     pub fn get_locked_value(&self) -> &[u8] {
         &self.locked_value
     }
-    
+
     /// Start the background monitoring thread
     fn start_monitoring(&mut self, initial_address: usize) -> Result<(), MemoryError> {
         // If already locked, stop first
         if self.worker_thread.is_some() {
             self.unlock()?;
         }
-        
+
         // Reset stop flag
         self.stop_flag.store(false, Ordering::Relaxed);
-        
+
         let handle = self.handle.as_ref().unwrap();
         let address_source = self.address_source.clone().unwrap();
         let pid = self.pid.unwrap();
-        let handle_int = handle.0 .0 as isize;  // Convert HANDLE to integer
+        let handle_int = handle.0 .0 as isize; // Convert HANDLE to integer
         let locked_value = self.locked_value.clone();
         let size = self.size;
         let interval = self.scan_interval;
         let stop_flag: Arc<AtomicBool> = Arc::clone(&self.stop_flag);
-        
+
         // Convert integer back to HANDLE inside the thread
         let thread_handle = thread::spawn(move || {
             let handle = HANDLE(handle_int as *mut std::ffi::c_void);
             let mut current_address = initial_address;
-            
+
             while !stop_flag.load(Ordering::Relaxed) {
                 // For dynamic addresses, re-resolve on each cycle
                 if let AddressSource::Dynamic(_) = address_source {
@@ -309,7 +317,7 @@ impl MemoryLock {
                         }
                     }
                 }
-                
+
                 // Read current value
                 match read_memory_bytes(handle, current_address, size) {
                     Ok(current_value) => {
@@ -325,12 +333,12 @@ impl MemoryLock {
                         continue;
                     }
                 }
-                
+
                 // Wait before next check
                 thread::sleep(interval);
             }
         });
-        
+
         self.worker_thread = Some(thread_handle);
         Ok(())
     }
@@ -367,15 +375,41 @@ macro_rules! impl_as_bytes {
 
 impl_as_bytes!(u8, u16, u32, u64, i8, i16, i32, i64, f32, f64);
 
-/// Builder for MemoryLock configuration
+/// Builder for MemoryLock with deferred parameter binding
 ///
-/// # Example
+/// This builder supports **deferred parameter binding**, allowing you to configure
+/// lock parameters at different stages. All parameters are optional during construction.
+/// Validation happens at `build()` time.
+///
+/// # Example 1: Build-time specification (All at once)
 /// ```no_run
 /// use win_auto_utils::memory_hook::MemoryLock;
 ///
 /// let mut lock = MemoryLock::builder()
 ///     .handle(handle)
 ///     .address(0x7FF6A1B2C3D4)
+///     .value(100u32)
+///     .build()?;
+///
+/// lock.start()?;
+/// # Ok::<_, Box<dyn std::error::Error>>(())
+/// ```
+///
+/// # Example 2: Install-time specification (Deferred binding)
+/// ```no_run
+/// use win_auto_utils::memory_hook::MemoryLock;
+///
+/// // Step 1: Pre-configure static parameters
+/// let builder = MemoryLock::builder()
+///     .address(0x7FF6A1B2C3D4)
+///     .scan_interval_ms(5);
+///
+/// // ... wait for process to start ...
+/// let handle = open_process("game.exe")?;
+///
+/// // Step 2: Bind dynamic parameters and start
+/// let mut lock = builder.clone()
+///     .handle(handle)
 ///     .value(100u32)
 ///     .build()?;
 ///
@@ -483,7 +517,7 @@ impl MemoryLockBuilder {
         // Validate required parameters
         let handle = self.handle.ok_or_else(|| {
             MemoryError::WriteFailed(
-                "handle must be set. Call .handle(handle) before build().".to_string()
+                "handle must be set. Call .handle(handle) before build().".to_string(),
             )
         })?;
 
@@ -495,7 +529,8 @@ impl MemoryLockBuilder {
 
         let locked_value = self.locked_value.ok_or_else(|| {
             MemoryError::WriteFailed(
-                "locked_value must be set. Call .value(val) or .bytes(data) before build().".to_string()
+                "locked_value must be set. Call .value(val) or .bytes(data) before build()."
+                    .to_string(),
             )
         })?;
 
@@ -524,71 +559,64 @@ impl MemoryLockBuilder {
 #[cfg(test)]
 mod tests {
     use super::*;
-    
+
     #[test]
     fn test_as_bytes_u32() {
         let value: u32 = 0x12345678;
         let bytes = value.as_bytes();
-        
+
         assert_eq!(bytes.len(), 4);
         // Little-endian on x86/x64
         assert_eq!(bytes[0], 0x78);
         assert_eq!(bytes[3], 0x12);
     }
-    
+
     #[test]
     fn test_builder_clone_support() {
         let builder = MemoryLock::builder()
             .address(0x1000)
             .value(100u32)
             .scan_interval_ms(5);
-        
+
         // Clone and bind different handles
-        let lock1 = builder.clone()
-            .handle(HANDLE::default())
-            .build();
-        
-        let lock2 = builder.clone()
-            .handle(HANDLE::default())
-            .build();
-        
+        let lock1 = builder.clone().handle(HANDLE::default()).build();
+
+        let lock2 = builder.clone().handle(HANDLE::default()).build();
+
         assert!(lock1.is_ok());
         assert!(lock2.is_ok());
     }
-    
+
     #[test]
     fn test_builder_validation_missing_handle() {
-        let result = MemoryLock::builder()
-            .address(0x1000)
-            .value(100u32)
-            .build();
-        
+        let result = MemoryLock::builder().address(0x1000).value(100u32).build();
+
         assert!(result.is_err());
         if let Err(e) = result {
             assert!(e.to_string().contains("handle must be set"));
         }
     }
-    
+
     #[test]
     fn test_builder_validation_missing_address() {
         let result = MemoryLock::builder()
             .handle(HANDLE::default())
             .value(100u32)
             .build();
-        
+
         assert!(result.is_err());
         if let Err(e) = result {
             assert!(e.to_string().contains("address must be set"));
         }
     }
-    
+
     #[test]
     fn test_builder_validation_missing_value() {
         let result = MemoryLock::builder()
             .handle(HANDLE::default())
             .address(0x1000)
             .build();
-        
+
         assert!(result.is_err());
         if let Err(e) = result {
             assert!(e.to_string().contains("locked_value must be set"));

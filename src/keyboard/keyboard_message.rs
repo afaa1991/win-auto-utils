@@ -78,21 +78,21 @@ pub fn post_key_click_atomic(hwnd: HWND, vk_code: u8, scan_code: u16) {
 
 /// PostMessage keyboard errors
 #[derive(Debug)]
-pub enum PostMessageError {
+pub enum PostMessageKeyBoardError {
     InvalidWindow,
     SendMessageFailed,
 }
 
-impl std::fmt::Display for PostMessageError {
+impl std::fmt::Display for PostMessageKeyBoardError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            PostMessageError::InvalidWindow => write!(f, "Invalid window handle"),
-            PostMessageError::SendMessageFailed => write!(f, "Failed to send message"),
+            PostMessageKeyBoardError::InvalidWindow => write!(f, "Invalid window handle"),
+            PostMessageKeyBoardError::SendMessageFailed => write!(f, "Failed to send message"),
         }
     }
 }
 
-impl std::error::Error for PostMessageError {}
+impl std::error::Error for PostMessageKeyBoardError {}
 
 /// User-friendly PostMessage keyboard controller
 ///
@@ -118,10 +118,10 @@ impl PostMessageKeyboard {
     /// # Note
     /// This method performs string-to-code conversion at runtime.
     /// For better performance, pre-compile key codes and use `press_with_codes`.
-    pub fn press(&self, key: &str) -> Result<(), PostMessageError> {
+    pub fn press(&self, key: &str) -> Result<(), PostMessageKeyBoardError> {
         let vk_code = key_code(key);
         if vk_code == 0 {
-            return Err(PostMessageError::InvalidWindow);
+            return Err(PostMessageKeyBoardError::InvalidWindow);
         }
         let scan_code = get_scan_code(vk_code);
         post_key_down_atomic(self.hwnd, vk_code, scan_code);
@@ -129,10 +129,10 @@ impl PostMessageKeyboard {
     }
 
     /// Release a key by name (convenience method)
-    pub fn release(&self, key: &str) -> Result<(), PostMessageError> {
+    pub fn release(&self, key: &str) -> Result<(), PostMessageKeyBoardError> {
         let vk_code = key_code(key);
         if vk_code == 0 {
-            return Err(PostMessageError::InvalidWindow);
+            return Err(PostMessageKeyBoardError::InvalidWindow);
         }
         let scan_code = get_scan_code(vk_code);
         post_key_up_atomic(self.hwnd, vk_code, scan_code);
@@ -140,10 +140,10 @@ impl PostMessageKeyboard {
     }
 
     /// Click a key by name (convenience method)
-    pub fn click(&self, key: &str) -> Result<(), PostMessageError> {
+    pub fn click(&self, key: &str) -> Result<(), PostMessageKeyBoardError> {
         let vk_code = key_code(key);
         if vk_code == 0 {
-            return Err(PostMessageError::InvalidWindow);
+            return Err(PostMessageKeyBoardError::InvalidWindow);
         }
         let scan_code = get_scan_code(vk_code);
         post_key_click_atomic(self.hwnd, vk_code, scan_code);
@@ -151,19 +151,19 @@ impl PostMessageKeyboard {
     }
 
     /// Press a key using pre-compiled codes (high performance)
-    pub fn press_with_codes(&self, vk_code: u8, scan_code: u16) -> Result<(), PostMessageError> {
+    pub fn press_with_codes(&self, vk_code: u8, scan_code: u16) -> Result<(), PostMessageKeyBoardError> {
         post_key_down_atomic(self.hwnd, vk_code, scan_code);
         Ok(())
     }
 
     /// Release a key using pre-compiled codes
-    pub fn release_with_codes(&self, vk_code: u8, scan_code: u16) -> Result<(), PostMessageError> {
+    pub fn release_with_codes(&self, vk_code: u8, scan_code: u16) -> Result<(), PostMessageKeyBoardError> {
         post_key_up_atomic(self.hwnd, vk_code, scan_code);
         Ok(())
     }
 
     /// Click a key using pre-compiled codes
-    pub fn click_with_codes(&self, vk_code: u8, scan_code: u16) -> Result<(), PostMessageError> {
+    pub fn click_with_codes(&self, vk_code: u8, scan_code: u16) -> Result<(), PostMessageKeyBoardError> {
         post_key_click_atomic(self.hwnd, vk_code, scan_code);
         Ok(())
     }

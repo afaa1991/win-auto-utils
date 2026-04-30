@@ -3,7 +3,7 @@
 //! Implements the `moverel` instruction for moving the mouse relatively from current position.
 
 use super::{parse_mouse_mode, MouseMode, MoveRelParams};
-use crate::mouse::send_input;
+use crate::mouse::mouse_input;
 use crate::script_engine::instruction::{
     InstructionData, InstructionHandler, InstructionMetadata, ScriptError,
 };
@@ -70,7 +70,7 @@ impl InstructionHandler for MoveRelHandler {
 
         // Pre-build INPUT structure for SendInput mode
         let send_input = if mode == MouseMode::Send {
-            Some(send_input::build_move_relative(dx, dy))
+            Some(mouse_input::build_move_relative(dx, dy))
         } else {
             None
         };
@@ -107,7 +107,7 @@ impl InstructionHandler for MoveRelHandler {
             MouseMode::Send => {
                 // Execute pre-built INPUT structure directly (zero overhead)
                 if let Some(ref input) = params.send_input {
-                    send_input::execute_single_input(input).map_err(|e| {
+                    mouse_input::execute_single_input(input).map_err(|e| {
                         ScriptError::ExecutionError(format!("Move relative failed: {:?}", e))
                     })?;
                 }

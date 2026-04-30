@@ -1,401 +1,267 @@
-# 进程与窗口管理 (Process & Window Management)
+# 进程与窗口管理
 
 [English](../../en/modules/process_window.md) | [返回概览](overview.md)
 
-`process` 模块通过流畅的构建器模式提供全面的进程和窗口管理。它支持多种设备上下文（DC）模式以适应不同的屏幕捕获场景，延迟初始化以优化性能，以及自动资源清理。
+`process` 模块提供全面的进程和窗口管理，拥有简洁直观的 API。支持多种设备上下文（DC）模式以适应不同的屏幕捕获场景，并自动清理资源。
 
 ## Feature Flag
 
-```toml
+``toml
 [dependencies]
-win-auto-utils = { version = "0.1.0", features = ["process"] }
+win-auto-utils = { version = "0.2.0", features = ["process"] }
 ```
 
 ## 快速开始
 
-### 基础进程管理
+### 方法 1：一步初始化（最简单）
 
 ```rust
 use win_auto_utils::process::Process;
 
-// 使用默认设置的简单用法
-let mut process = Process::builder("notepad.exe").build();
+// 通过进程名初始化 - 查找第一个匹配的进程
+let mut process = Process::init_by_name("notepad.exe")?;
+println!("PID: {}", process.pid_or_default());
+println!("HWND: {:?}", process.hwnd_or_default());
+```
+
+### 方法 2：使用 Builder（灵活配置）
+
+```rust
+use win_auto_utils::process::{Process, ProcessConfig};
+
+// 使用直观的方法构建配置
+let config = ProcessConfig::builder("game.exe")
+    .set_window_client_mode()  // 最适合游戏
+    .exclude_invisible()       // 跳过隐藏窗口
+    .include_by_title("Game Window")  // 按标题过滤
+    .build();
+
+let mut process = Process::new(config);
+process.init()?;
+```
+
+### 方法 3：通过 PID 初始化（多实例支持）
+
+```rust
+use win_auto_utils::process::Process;
+
+// 当你知道具体的 PID 时
+let mut process = Process::init_by_pid(12345)?;
+println!("已连接到 PID: {}", process.pid_or_default());
+```
+
+### 方法 4：重新初始化现有进程
+
+```rust
+use win_auto_utils::process::Process;
+
+// 创建但不初始化
+let mut process = Process::by_name("app.exe");
+
+// 稍后初始化
 process.init()?;
 
-println!("PID: {}", process.get_pid());
-println!("句柄: {:?}", process.get_handle());
+// 切换到不同实例
+process.init_with_pid(67890)?;
 ```
 
-### 全屏捕获的桌面模式
+## DC 模式选项
+
+根据你的需求选择合适的 DC 模式：
 
 ```rust
-use win_auto_utils::process::{Process, DCMode};
+use win_auto_utils::process::{Process, ProcessConfig};
 
-// 配置为全屏捕获
-let mut game = Process::builder("game.exe")
-    .set_dc_mode(DCMode::Desktop)
+// 选项 1：Standard - 完整窗口（标题栏 + 边框）
+let config = ProcessConfig::builder("app.exe")
+    .set_window_mode()
     .build();
 
-game.init()?;
-// 现在已准备好进行桌面级屏幕捕获
+// 选项 2：WindowClient - 仅客户区（推荐用于游戏）
+let config = ProcessConfig::builder("game.exe")
+    .set_window_client_mode()
+    .build();
+
+// 选项 3：Desktop - 全屏桌面捕获
+let config = ProcessConfig::builder("fullscreen_game.exe")
+    .set_desktop_mode()
+    .build();
 ```
 
-## 核心功能
+## 窗口过滤
 
-- **构建器模式**: 灵活配置的流畅 API
-- **多种 DC 模式**: Standard、WindowClient、Desktop
-- **延迟初始化**: 仅在需要时分配资源
-- **自动清理**: 通过 Drop trait 实现 RAII
-- **窗口过滤**: 按标题模式查找特定窗口
-- **线程安全**: 细粒度锁定以支持并发访问
-
-## 使用示例
-
-### 示例 1: 带窗口过滤的进程
+按标题或可见性过滤窗口：
 
 ```rust
-use win_auto_utils::process::Process;
+use win_auto_utils::process::{Process, ProcessConfig};
 
-// 按标题过滤窗口
-let filters = vec![
-    ("Document".to_string(), 1),  // 必须包含 "Document"
-    ("Untitled".to_string(), 0),  // 不能包含 "Untitled"
-];
-
-let mut word = Process::builder("winword.exe")
-    .hwnd_filter(filters)
+// 示例 1：排除不可见窗口
+let config = ProcessConfig::builder("app.exe")
+    .exclude_invisible()
     .build();
 
-word.init()?;
-println!("找到的窗口: {:?}", word.get_hwnd());
+// 示例 2：按标题模式过滤（不区分大小写）
+let config = ProcessConfig::builder("chrome.exe")
+    .include_by_title("YouTube")
+    .build();
+
+// 示例 3：精确标题匹配（区分大小写）
+let config = ProcessConfig::builder("notepad.exe")
+    .include_by_exact_title("document.txt - Notepad")
+    .build();
+
+// 示例 4：组合过滤
+let config = ProcessConfig::builder("game.exe")
+    .set_window_client_mode()
+    .exclude_invisible()
+    .include_by_title("Main Window")
+    .build();
+
+let mut process = Process::new(config);
+process.init()?;
 ```
 
-### 示例 2: 不同的 DC 模式
+## 进程管理器（多进程管理）
+
+使用单个管理器管理多个进程：
 
 ```rust
-use win_auto_utils::process::{Process, DCMode};
+use win_auto_utils::process::{Process, ProcessConfig, ProcessManager};
 
-// 模式 1: Standard - 捕获整个窗口（标题栏 + 边框）
-let mut proc1 = Process::builder("app.exe")
-    .set_dc_mode(DCMode::Standard)
-    .build();
+let mut manager = ProcessManager::new();
 
-// 模式 2: WindowClient - 仅捕获客户区（内容）
-let mut proc2 = Process::builder("app.exe")
-    .set_dc_mode(DCMode::WindowClient)
-    .build();
+// 注册进程
+manager.register("notepad.exe")?;
+manager.register_alias("game", "target.exe")?;
 
-// 模式 3: Desktop - 捕获整个桌面（用于全屏游戏）
-let mut proc3 = Process::builder("game.exe")
-    .desktop_mode()  // set_dc_mode(DCMode::Desktop) 的简写
-    .build();
+// 使用不同策略初始化
+manager.init("notepad.exe")?;
+manager.init_with_pid("game", 12345)?;
 
-proc1.init()?;
-proc2.init()?;
-proc3.init()?;
+// 查询进程（只读，不需要 mut）
+if let Some(proc) = manager.get("notepad.exe") {
+    println!("PID: {:?}", proc.pid());
+}
+
+// 列出所有管理的进程
+for (name, proc) in manager.list_processes() {
+    println!("{}: PID={:?}", name, proc.pid());
+}
 ```
 
-### 示例 3: 便捷方法
+## 错误处理
 
-```rust
-use win_auto_utils::process::Process;
-
-// 对常见配置使用便捷方法
-let game = Process::builder("fullscreen_game.exe")
-    .desktop_mode()  // 等同于 .set_dc_mode(DCMode::Desktop)
-    .build();
-
-let app = Process::builder("windowed_app.exe")
-    .window_client_mode()  // 等同于 .set_dc_mode(DCMode::WindowClient)
-    .build();
-```
-
-### 示例 4: 错误处理
+优雅地处理常见错误：
 
 ```rust
 use win_auto_utils::process::{Process, ProcessError};
 
-match Process::builder("nonexistent.exe").build().init() {
-    Ok(_) => println!("进程已初始化"),
+match Process::init_by_name("nonexistent.exe") {
+    Ok(mut process) => {
+        println!("进程已初始化: PID={}", process.pid_or_default());
+    }
     Err(ProcessError::ProcessNotFound(name)) => {
         eprintln!("未找到进程 '{}'", name);
     }
-    Err(ProcessError::HandleOpenFailed(pid)) => {
-        eprintln!("无法打开 PID {} 的句柄", pid);
+    Err(ProcessError::WindowNotFound(pid)) => {
+        eprintln!("PID {} 未找到窗口", pid);
     }
-    Err(e) => eprintln!("错误: {}", e),
+    Err(e) => {
+        eprintln!("初始化失败: {}", e);
+    }
 }
 ```
 
-### 示例 5: 访问进程信息
+## 完整示例
+
+### 示例 1：游戏自动化设置
+
+```rust
+use win_auto_utils::process::{Process, ProcessConfig};
+
+// 为游戏捕获配置
+let config = ProcessConfig::builder("target.exe")
+    .set_window_client_mode()  // 仅客户区
+    .exclude_invisible()       // 跳过最小化窗口
+    .include_by_title("Game")  // 确保是正确的窗口
+    .build();
+
+let mut game = Process::new(config);
+game.init()?;
+
+println!("游戏 PID: {}", game.pid_or_default());
+println!("游戏 HWND: {:?}", game.hwnd_or_default());
+```
+
+### 示例 2：多实例应用
+
+```rust
+use win_auto_utils::process::Process;
+use win_auto_utils::snapshot::find_pids_by_name;
+
+// 查找所有实例
+let pids = find_pids_by_name("notepad.exe");
+println!("找到 {} 个记事本实例", pids.len());
+
+// 连接到每个实例
+for pid in pids {
+    let mut process = Process::init_by_pid(pid)?;
+    println!("  PID {}: HWND={:?}", pid, process.hwnd_or_default());
+}
+```
+
+### 示例 3：动态进程切换
 
 ```rust
 use win_auto_utils::process::Process;
 
-let mut process = Process::builder("chrome.exe").build();
+let mut app = Process::by_name("target.exe");
+
+// 初始化第一个实例
+app.init()?;
+println!("第一个实例: PID={}", app.pid_or_default());
+
+// 稍后切换到另一个实例
+app.init_with_pid(67890)?;
+println!("已切换到: PID={}", app.pid_or_default());
+```
+
+## 核心特性
+
+✅ **直观的 API** - 无需记忆枚举，方法名自解释  
+✅ **多种初始化方式** - 选择适合你的用例  
+✅ **智能窗口过滤** - 按标题或可见性精确定位窗口  
+✅ **多进程支持** - 轻松管理多个实例  
+✅ **自动资源清理** - 通过 Drop trait 实现 RAII  
+✅ **性能优化** - 延迟初始化，最小开销  
+
+## 迁移指南（v0.1.x → v0.2.0）
+
+### 旧 API（v0.1.x）
+```rust
+// ❌ 不再这样使用
+let mut process = Process::new("app.exe");
+process.dc_mode = DCMode::WindowClient;
+process.hwnd_filter = Some(filters);
 process.init()?;
-
-// 获取进程信息
-let pid = process.get_pid();
-let handle = process.get_handle();
-let hwnd = process.get_hwnd();
-let dc = process.get_dc();
-
-println!("PID: {}", pid);
-println!("窗口句柄: {:?}", hwnd);
-println!("设备上下文: {:?}", dc);
 ```
 
-### 示例 6: 多个进程
-
+### 新 API（v0.2.0）
 ```rust
-use win_auto_utils::process::Process;
+// ✅ 改用这种方式
+let config = ProcessConfig::builder("app.exe")
+    .set_window_client_mode()
+    .exclude_invisible()
+    .include_by_title("App Window")
+    .build();
 
-// 管理多个进程
-let mut notepad = Process::builder("notepad.exe").build();
-let mut calc = Process::builder("calc.exe").build();
-
-notepad.init()?;
-calc.init()?;
-
-println!("记事本 PID: {}", notepad.get_pid());
-println!("计算器 PID: {}", calc.get_pid());
-
-// 丢弃时自动清理资源
-```
-
-## API 参考
-
-### 主要类型
-
-#### Process
-
-管理进程和窗口的主要结构体。
-
-**构造函数**:
-- `Process::builder(name: &str) -> ProcessBuilder` - 创建配置构建器
-
-**方法**:
-- `init(&mut self) -> ProcessResult<()>` - 初始化进程（延迟）
-- `get_pid(&self) -> u32` - 获取进程 ID
-- `get_handle(&self) -> HANDLE` - 获取进程句柄
-- `get_hwnd(&self) -> HWND` - 获取窗口句柄
-- `get_dc(&self) -> HDC` - 获取设备上下文
-- `get_dc_mode(&self) -> DCMode` - 获取当前 DC 模式
-
-#### ProcessBuilder
-
-用于配置 Process 实例的流畅构建器。
-
-**构造函数**:
-- `Process::builder(name: &str)` - 开始构建进程
-
-**配置方法**:
-- `set_dc_mode(mode: DCMode) -> Self` - 设置 DC 获取模式
-- `set_dc_mode_num(value: u8) -> Self` - 按数字设置 DC 模式（1/2/3）
-- `try_set_dc_mode_num(value: u8) -> Result<Self, Self>` - 可失败版本
-- `desktop_mode() -> Self` - Desktop DC 模式的简写
-- `window_client_mode() -> Self` - WindowClient DC 模式的简写
-- `standard_mode() -> Self` - Standard DC 模式的简写
-- `hwnd_filter(filters: HwndFilter) -> Self` - 设置窗口标题过滤器
-- `build() -> Process` - 构建配置好的 Process 实例
-
-#### DCMode
-
-设备上下文获取模式枚举。
-
-**变体**:
-- `DCMode::Standard`（值: 1）- 完整窗口包括标题栏/边框
-- `DCMode::WindowClient`（值: 2）- 仅客户区（内容）
-- `DCMode::Desktop`（值: 3）- 全屏桌面捕获
-
-**方法**:
-- `as_u8(&self) -> u8` - 转换为数字值
-- `from_u8(value: u8) -> Option<DCMode>` - 从数字值创建
-
-#### ProcessError
-
-进程操作的错误类型。
-
-**变体**:
-- `ProcessNotFound(String)` - 按名称未找到进程
-- `HandleOpenFailed(u32)` - 无法打开进程句柄
-- `WindowNotFound(u32)` - 未找到 PID 的窗口
-- `DCNotFound(HWND)` - 无法获取设备上下文
-- `InvalidDCMode(u8)` - 无效的 DC 模式值
-
-### 类型别名
-
-- `HwndFilter` - `Vec<(String, u8)>` - 窗口标题过滤器
-  - `String`: 要匹配的模式
-  - `u8`: 过滤器掩码（1 = 必须包含，0 = 不能包含）
-
-- `ProcessResult<T>` - `Result<T, ProcessError>` - 操作的结果类型
-
-## DC 模式对比
-
-| 模式 | 捕获内容 | 用例 | 方法 |
-|------|---------|------|------|
-| **Standard** | 完整窗口（标题 + 边框 + 内容） | 一般窗口应用 | `.standard_mode()` |
-| **WindowClient** | 仅客户区（内容） | 不带窗口装饰的应用内容 | `.window_client_mode()` |
-| **Desktop** | 整个桌面 | 全屏游戏、覆盖层 | `.desktop_mode()` |
-
-### 可视化对比
-
-```
-Standard 模式:
-┌─────────────────────┐
-│  标题栏              │  ← 包含
-├─────────────────────┤
-│                     │
-│   内容区域           │  ← 包含
-│                     │
-└─────────────────────┘
-
-WindowClient 模式:
-┌─────────────────────┐
-│  标题栏              │  ← 排除
-├─────────────────────┤
-│                     │
-│   内容区域           │  ← 捕获
-│                     │
-└─────────────────────┘
-
-Desktop 模式:
-┌───────────────────────────┐
-│  整个桌面屏幕              │  ← 捕获
-│  （所有窗口组合）          │
-└───────────────────────────┘
-```
-
-## 最佳实践
-
-1. **使用构建器模式提高清晰度**
-   ```rust
-   // 清晰明了
-   let process = Process::builder("game.exe")
-       .desktop_mode()
-       .build();
-   
-   // vs 手动配置
-   let mut process = Process::new("game.exe");
-   process.set_dc_mode(DCMode::Desktop);
-   ```
-
-2. **仅在需要时初始化**
-   ```rust
-   let mut process = Process::builder("app.exe").build();
-   
-   // 配置发生在这里（不分配资源）
-   
-   process.init()?;  // 现在分配资源
-   
-   // 使用进程...
-   ```
-
-3. **选择正确的 DC 模式**
-   ```rust
-   // 对于窗口应用
-   let app = Process::builder("notepad.exe")
-       .window_client_mode()
-       .build();
-   
-   // 对于全屏游戏
-   let game = Process::builder("game.exe")
-       .desktop_mode()
-       .build();
-   ```
-
-4. **优雅地处理错误**
-   ```rust
-   match process.init() {
-       Ok(_) => use_process(&process),
-       Err(e) => log_error(e),
-   }
-   ```
-
-5. **让 RAII 处理清理**
-   ```rust
-   {
-       let mut process = Process::builder("app.exe").build();
-       process.init()?;
-       // 使用进程...
-   }  // 在这里自动清理
-   ```
-
-## 常见陷阱
-
-### ❌ 忘记调用 init()
-
-```rust
-// 错误: 进程未初始化
-let process = Process::builder("app.exe").build();
-let pid = process.get_pid();  // 返回 0 或无效！
-
-// 正确: 始终先初始化
-let mut process = Process::builder("app.exe").build();
+let mut process = Process::new(config);
 process.init()?;
-let pid = process.get_pid();  // 有效的 PID
 ```
 
-### ❌ 使用错误的 DC 模式
-
-```rust
-// 错误: 全屏游戏使用 Standard 模式
-let game = Process::builder("game.exe")
-    .standard_mode()  // 无法正确捕获！
-    .build();
-
-// 正确: 全屏使用 Desktop 模式
-let game = Process::builder("game.exe")
-    .desktop_mode()
-    .build();
-```
-
-### ❌ 不检查窗口过滤器
-
-```rust
-// 错误: 假设窗口会被找到
-let filters = vec![("Specific Title".to_string(), 1)];
-let process = Process::builder("app.exe")
-    .hwnd_filter(filters)
-    .build();
-process.init()?;  // 如果没有匹配的窗口可能会失败
-
-// 正确: 检查结果
-match process.init() {
-    Ok(_) => println!("找到窗口"),
-    Err(ProcessError::WindowNotFound(_)) => {
-        eprintln!("没有匹配过滤器的窗口");
-    }
-    Err(e) => eprintln!("错误: {}", e),
-}
-```
-
-## 性能考虑
-
-- **延迟初始化**: 调用 `init()` 之前零开销
-- **资源缓存**: 首次访问后缓存 DC 和句柄
-- **批量操作**: 尽可能一起初始化多个进程
-- **DC 模式影响**: Desktop 模式比窗口特定模式稍慢
-
-### 初始化时间
-
-| 操作 | 典型时间 |
-|------|---------|
-| 构建器创建 | < 1μs |
-| 进程查找 | 1-5ms |
-| 句柄打开 | 1-2ms |
-| DC 获取 | 1-3ms |
-| 总 init() | 3-10ms |
-
-## 相关模块
-
-- [`hwnd`](process_window.md): 窗口句柄工具
-- [`snapshot`](process_window.md): 进程/模块枚举
-- [`dxgi`](dxgi.md): 高级屏幕捕获
-- [`memory`](memory.md): 读/写进程内存
-
----
-
-**语言**: [English](../../en/modules/process_window.md) | [中文](process_window.md)
+### 主要变更
+1. **配置不可变** - 使用 `ProcessConfig` builder
+2. **无直接字段访问** - 所有配置通过 builder
+3. **直观的方法名** - `.set_window_client_mode()` 替代 `.dc_mode(DCMode::WindowClient)`
+4. **更好的错误处理** - 更具体的错误类型
+5. **简化的导入** - 只需 `Process`、`ProcessConfig`、`ProcessManager`

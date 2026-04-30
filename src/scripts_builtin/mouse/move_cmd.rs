@@ -3,7 +3,7 @@
 //! Implements the `move` instruction for moving the mouse to an absolute position.
 
 use super::{parse_mouse_mode, MouseMode, MoveParams};
-use crate::mouse::send_input;
+use crate::mouse::mouse_input;
 use crate::script_engine::instruction::{
     InstructionData, InstructionHandler, InstructionMetadata, ScriptError,
 };
@@ -122,18 +122,18 @@ impl InstructionHandler for MoveHandler {
 
                 // OPTIMIZATION: Use SetCursorPos instead of SendInput(MOVE) for 22x speedup
                 // ~2.2 μs vs ~50 μs per call
-                send_input::set_cursor_pos(screen_x, screen_y).map_err(|e| {
+                mouse_input::set_cursor_pos(screen_x, screen_y).map_err(|e| {
                     ScriptError::ExecutionError(format!("SetCursorPos failed: {:?}", e))
                 })?;
             }
             MouseMode::Post => {
                 #[cfg(feature = "script_process_context")]
                 {
-                    use crate::mouse::post_message;
+                    use crate::mouse::mouse_message;
 
                     let (client_x, client_y) =
                         super::convert_to_client_coords(vm, params.x, params.y)?;
-                    post_message::post_move_atomic(
+                    mouse_message::post_move_atomic(
                         vm.process.get_hwnd_or_err()?,
                         client_x,
                         client_y,

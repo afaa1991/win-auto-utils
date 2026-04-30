@@ -27,9 +27,9 @@ use windows::Win32::UI::WindowsAndMessaging::SetCursorPos;
 /// * `x` - Screen X coordinate in pixels
 /// * `y` - Screen Y coordinate in pixels
 #[inline]
-pub fn set_cursor_pos(x: i32, y: i32) -> Result<(), SendInputError> {
+pub fn set_cursor_pos(x: i32, y: i32) -> Result<(), SendMouseInputError> {
     unsafe {
-        SetCursorPos(x, y).map_err(|_| SendInputError::SetCursorPosFailed)?;
+        SetCursorPos(x, y).map_err(|_| SendMouseInputError::SetCursorPosFailed)?;
         Ok(())
     }
 }
@@ -46,7 +46,7 @@ pub fn set_cursor_pos(x: i32, y: i32) -> Result<(), SendInputError> {
 /// # Parameters
 /// * `inputs` - Pre-built INPUT structures (created at parse/compile time)
 #[inline]
-pub fn execute_inputs(inputs: &[INPUT]) -> Result<(), SendInputError> {
+pub fn execute_inputs(inputs: &[INPUT]) -> Result<(), SendMouseInputError> {
     if inputs.is_empty() {
         return Ok(());
     }
@@ -59,7 +59,7 @@ pub fn execute_inputs(inputs: &[INPUT]) -> Result<(), SendInputError> {
     };
     
     if result == 0 {
-        Err(SendInputError::SendInputFailed)
+        Err(SendMouseInputError::SendInputFailed)
     } else {
         Ok(())
     }
@@ -67,7 +67,7 @@ pub fn execute_inputs(inputs: &[INPUT]) -> Result<(), SendInputError> {
 
 /// Execute a single INPUT structure atomically
 #[inline]
-pub fn execute_single_input(input: &INPUT) -> Result<(), SendInputError> {
+pub fn execute_single_input(input: &INPUT) -> Result<(), SendMouseInputError> {
     execute_inputs(&[input.clone()])
 }
 
@@ -274,23 +274,23 @@ pub fn build_scroll_down_at(x: i32, y: i32, delta: i32) -> Vec<INPUT> {
 
 /// Error type for SendInput operations
 #[derive(Debug, Clone)]
-pub enum SendInputError {
+pub enum SendMouseInputError {
     /// SendInput API call failed
     SendInputFailed,
     /// SetCursorPos API call failed
     SetCursorPosFailed,
 }
 
-impl std::fmt::Display for SendInputError {
+impl std::fmt::Display for SendMouseInputError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            SendInputError::SendInputFailed => write!(f, "SendInput API call failed"),
-            SendInputError::SetCursorPosFailed => write!(f, "SetCursorPos API call failed"),
+            SendMouseInputError::SendInputFailed => write!(f, "SendInput API call failed"),
+            SendMouseInputError::SetCursorPosFailed => write!(f, "SetCursorPos API call failed"),
         }
     }
 }
 
-impl std::error::Error for SendInputError {}
+impl std::error::Error for SendMouseInputError {}
 
 /// Convenience wrapper for mouse input
 /// 
@@ -306,73 +306,73 @@ impl SendInputMouse {
     }
 
     /// Click left button at current position (convenience method)
-    pub fn click_left(&self) -> Result<(), SendInputError> {
+    pub fn click_left(&self) -> Result<(), SendMouseInputError> {
         let inputs = build_click_left();
         execute_inputs(&inputs)
     }
 
     /// Click left button at specified coordinates
-    pub fn click_left_at(&self, x: i32, y: i32) -> Result<(), SendInputError> {
+    pub fn click_left_at(&self, x: i32, y: i32) -> Result<(), SendMouseInputError> {
         let inputs = build_click_left_at(x, y);
         execute_inputs(&inputs)
     }
 
     /// Click right button at current position
-    pub fn click_right(&self) -> Result<(), SendInputError> {
+    pub fn click_right(&self) -> Result<(), SendMouseInputError> {
         let inputs = build_click_right();
         execute_inputs(&inputs)
     }
 
     /// Click right button at specified coordinates
-    pub fn click_right_at(&self, x: i32, y: i32) -> Result<(), SendInputError> {
+    pub fn click_right_at(&self, x: i32, y: i32) -> Result<(), SendMouseInputError> {
         let inputs = build_click_right_at(x, y);
         execute_inputs(&inputs)
     }
 
     /// Click middle button at current position
-    pub fn click_middle(&self) -> Result<(), SendInputError> {
+    pub fn click_middle(&self) -> Result<(), SendMouseInputError> {
         let inputs = build_click_middle();
         execute_inputs(&inputs)
     }
 
     /// Click middle button at specified coordinates
-    pub fn click_middle_at(&self, x: i32, y: i32) -> Result<(), SendInputError> {
+    pub fn click_middle_at(&self, x: i32, y: i32) -> Result<(), SendMouseInputError> {
         let inputs = build_click_middle_at(x, y);
         execute_inputs(&inputs)
     }
 
     /// Press left button
-    pub fn press_left(&self) -> Result<(), SendInputError> {
+    pub fn press_left(&self) -> Result<(), SendMouseInputError> {
         let input = build_press_left();
         execute_single_input(&input)
     }
 
     /// Release left button
-    pub fn release_left(&self) -> Result<(), SendInputError> {
+    pub fn release_left(&self) -> Result<(), SendMouseInputError> {
         let input = build_release_left();
         execute_single_input(&input)
     }
 
     /// Move mouse to absolute coordinates
-    pub fn move_to(&self, x: i32, y: i32) -> Result<(), SendInputError> {
+    pub fn move_to(&self, x: i32, y: i32) -> Result<(), SendMouseInputError> {
         let input = build_move(x, y);
         execute_single_input(&input)
     }
 
     /// Move mouse by relative offset
-    pub fn move_relative(&self, dx: i32, dy: i32) -> Result<(), SendInputError> {
+    pub fn move_relative(&self, dx: i32, dy: i32) -> Result<(), SendMouseInputError> {
         let input = build_move_relative(dx, dy);
         execute_single_input(&input)
     }
 
     /// Scroll up
-    pub fn scroll_up(&self, delta: i32) -> Result<(), SendInputError> {
+    pub fn scroll_up(&self, delta: i32) -> Result<(), SendMouseInputError> {
         let input = build_scroll_up(delta);
         execute_single_input(&input)
     }
 
     /// Scroll down
-    pub fn scroll_down(&self, delta: i32) -> Result<(), SendInputError> {
+    pub fn scroll_down(&self, delta: i32) -> Result<(), SendMouseInputError> {
         let input = build_scroll_down(delta);
         execute_single_input(&input)
     }

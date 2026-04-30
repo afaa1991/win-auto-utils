@@ -110,21 +110,21 @@ pub fn post_scroll_down_atomic(hwnd: HWND, x: i32, y: i32, delta: i32) {
 
 /// PostMessage mouse input errors
 #[derive(Debug)]
-pub enum PostMessageError {
+pub enum PostMessageMouseError {
     InvalidWindow,
     SendMessageFailed,
 }
 
-impl std::fmt::Display for PostMessageError {
+impl std::fmt::Display for PostMessageMouseError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            PostMessageError::InvalidWindow => write!(f, "Invalid window handle"),
-            PostMessageError::SendMessageFailed => write!(f, "Failed to send message"),
+            PostMessageMouseError::InvalidWindow => write!(f, "Invalid window handle"),
+            PostMessageMouseError::SendMessageFailed => write!(f, "Failed to send message"),
         }
     }
 }
 
-impl std::error::Error for PostMessageError {}
+impl std::error::Error for PostMessageMouseError {}
 
 // ============================================================================
 // Convenience Wrapper (User-Friendly API)
@@ -150,49 +150,49 @@ impl PostMessageMouse {
     }
 
     /// Click left button at specified coordinates
-    pub fn click_left(&self, x: i32, y: i32) -> Result<(), PostMessageError> {
+    pub fn click_left(&self, x: i32, y: i32) -> Result<(), PostMessageMouseError> {
         post_click_left_atomic(self.hwnd, x, y);
         Ok(())
     }
 
     /// Click right button at specified coordinates
-    pub fn click_right(&self, x: i32, y: i32) -> Result<(), PostMessageError> {
+    pub fn click_right(&self, x: i32, y: i32) -> Result<(), PostMessageMouseError> {
         post_click_right_atomic(self.hwnd, x, y);
         Ok(())
     }
 
     /// Click middle button at specified coordinates
-    pub fn click_middle(&self, x: i32, y: i32) -> Result<(), PostMessageError> {
+    pub fn click_middle(&self, x: i32, y: i32) -> Result<(), PostMessageMouseError> {
         post_click_middle_atomic(self.hwnd, x, y);
         Ok(())
     }
 
     /// Press left button at specified coordinates
-    pub fn press_left(&self, x: i32, y: i32) -> Result<(), PostMessageError> {
+    pub fn press_left(&self, x: i32, y: i32) -> Result<(), PostMessageMouseError> {
         post_press_left_atomic(self.hwnd, x, y);
         Ok(())
     }
 
     /// Release left button at specified coordinates
-    pub fn release_left(&self, x: i32, y: i32) -> Result<(), PostMessageError> {
+    pub fn release_left(&self, x: i32, y: i32) -> Result<(), PostMessageMouseError> {
         post_release_left_atomic(self.hwnd, x, y);
         Ok(())
     }
 
     /// Move mouse to specified coordinates
-    pub fn move_to(&self, x: i32, y: i32) -> Result<(), PostMessageError> {
+    pub fn move_to(&self, x: i32, y: i32) -> Result<(), PostMessageMouseError> {
         post_move_atomic(self.hwnd, x, y);
         Ok(())
     }
 
     /// Scroll up at specified coordinates
-    pub fn scroll_up(&self, x: i32, y: i32, delta: i32) -> Result<(), PostMessageError> {
+    pub fn scroll_up(&self, x: i32, y: i32, delta: i32) -> Result<(), PostMessageMouseError> {
         post_scroll_up_atomic(self.hwnd, x, y, delta);
         Ok(())
     }
 
     /// Scroll down at specified coordinates
-    pub fn scroll_down(&self, x: i32, y: i32, delta: i32) -> Result<(), PostMessageError> {
+    pub fn scroll_down(&self, x: i32, y: i32, delta: i32) -> Result<(), PostMessageMouseError> {
         post_scroll_down_atomic(self.hwnd, x, y, delta);
         Ok(())
     }

@@ -3,7 +3,7 @@
 //! Implements the `click` instruction for performing mouse clicks at specified or current position.
 
 use super::{ClickParams, MouseMode};
-use crate::mouse::send_input;
+use crate::mouse::mouse_input;
 use crate::script_engine::instruction::{
     InstructionData, InstructionHandler, InstructionMetadata, ScriptError,
 };
@@ -115,7 +115,7 @@ impl InstructionHandler for ClickHandler {
         // This avoids both HashMap lookup AND runtime INPUT construction
         let send_inputs = if mode == MouseMode::Send {
             // Pre-build the action part only (DOWN + UP), movement handled by SetCursorPos
-            send_input::build_click_left().to_vec()
+            mouse_input::build_click_left().to_vec()
         } else {
             vec![] // PostMessage mode doesn't need INPUT
         };
@@ -174,13 +174,13 @@ impl InstructionHandler for ClickHandler {
                 // OPTIMIZATION: Use SetCursorPos for movement + pre-built click for execution
                 if let Some((screen_x, screen_y)) = screen_coords {
                     // Step 1: Fast cursor positioning using SetCursorPos (~2.2 μs)
-                    send_input::set_cursor_pos(screen_x, screen_y).map_err(|e| {
+                    mouse_input::set_cursor_pos(screen_x, screen_y).map_err(|e| {
                         ScriptError::ExecutionError(format!("SetCursorPos failed: {:?}", e))
                     })?;
 
                     // Step 2: Execute pre-built click sequence (zero allocation, zero build)
                     // The INPUT array was pre-built at parse time with relative coordinates
-                    send_input::execute_inputs(&params.send_inputs).map_err(|e| {
+                    mouse_input::execute_inputs(&params.send_inputs).map_err(|e| {
                         ScriptError::ExecutionError(format!("Click failed: {:?}", e))
                     })?;
 
@@ -190,7 +190,7 @@ impl InstructionHandler for ClickHandler {
                     }
                 } else {
                     // No coordinates: use pre-built INPUT from parse phase (zero allocation)
-                    send_input::execute_inputs(&params.send_inputs).map_err(|e| {
+                    mouse_input::execute_inputs(&params.send_inputs).map_err(|e| {
                         ScriptError::ExecutionError(format!("Click failed: {:?}", e))
                     })?;
 
@@ -203,7 +203,7 @@ impl InstructionHandler for ClickHandler {
             MouseMode::Post => {
                 #[cfg(feature = "script_process_context")]
                 {
-                    use crate::mouse::post_message;
+                    use crate::mouse::mouse_message;
                     // Coordinates are guaranteed to exist in PostMessage mode (validated during parse)
                     let x = params.x.ok_or_else(|| {
                         ScriptError::ExecutionError("PostMessage click requires x coordinate".into())
@@ -213,7 +213,7 @@ impl InstructionHandler for ClickHandler {
                     })?;
                     // Convert window coordinates to client coordinates for PostMessage
                     let (client_x, client_y) = super::convert_to_client_coords(vm, x, y)?;
-                    post_message::post_click_left_atomic(
+                    mouse_message::post_click_left_atomic(
                         vm.process.get_hwnd_or_err()?,
                         client_x,
                         client_y,

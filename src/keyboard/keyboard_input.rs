@@ -36,7 +36,7 @@ use crate::utils::sleep_ms;
 /// send_input::execute_inputs(&inputs).unwrap();
 /// ```
 #[inline]
-pub fn execute_inputs(inputs: &[INPUT]) -> Result<(), SendInputError> {
+pub fn execute_inputs(inputs: &[INPUT]) -> Result<(), SendKeyBoardInputError> {
     if inputs.is_empty() {
         return Ok(());
     }
@@ -44,7 +44,7 @@ pub fn execute_inputs(inputs: &[INPUT]) -> Result<(), SendInputError> {
     let result = unsafe { SendInput(inputs, std::mem::size_of::<INPUT>() as i32) };
 
     if result == 0 {
-        Err(SendInputError::SendInputFailed)
+        Err(SendKeyBoardInputError::SendInputFailed)
     } else {
         Ok(())
     }
@@ -52,7 +52,7 @@ pub fn execute_inputs(inputs: &[INPUT]) -> Result<(), SendInputError> {
 
 /// Execute a single INPUT structure atomically
 #[inline]
-pub fn execute_single_input(input: &INPUT) -> Result<(), SendInputError> {
+pub fn execute_single_input(input: &INPUT) -> Result<(), SendKeyBoardInputError> {
     execute_inputs(&[input.clone()])
 }
 
@@ -116,20 +116,20 @@ pub fn build_key_up_input(vk_code: u8, extended: bool) -> INPUT {
 
 /// Error type for SendInput operations
 #[derive(Debug, Clone)]
-pub enum SendInputError {
+pub enum SendKeyBoardInputError {
     /// SendInput API call failed
     SendInputFailed,
 }
 
-impl std::fmt::Display for SendInputError {
+impl std::fmt::Display for SendKeyBoardInputError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            SendInputError::SendInputFailed => write!(f, "SendInput API call failed"),
+            SendKeyBoardInputError::SendInputFailed => write!(f, "SendInput API call failed"),
         }
     }
 }
 
-impl std::error::Error for SendInputError {}
+impl std::error::Error for SendKeyBoardInputError {}
 
 /// Convenience wrapper for keyboard input with string support
 ///
@@ -161,10 +161,10 @@ impl SendInputKeyboard {
     /// # Performance
     /// Has overhead from string-to-vk lookup. For high-performance scenarios,
     /// use `execute_inputs()` with pre-built INPUT structures instead.
-    pub fn click(&self, key: &str) -> Result<(), SendInputError> {
+    pub fn click(&self, key: &str) -> Result<(), SendKeyBoardInputError> {
         let vk_code = key_code(key);
         if vk_code == 0 {
-            return Err(SendInputError::SendInputFailed);
+            return Err(SendKeyBoardInputError::SendInputFailed);
         }
 
         let extended = crate::utils::key_code::is_extended_key(vk_code as u8);
@@ -180,19 +180,19 @@ impl SendInputKeyboard {
     }
 
     /// Press a key by VK code (lower overhead than string version)
-    pub fn press_with_vk(&self, vk_code: u8, extended: bool) -> Result<(), SendInputError> {
+    pub fn press_with_vk(&self, vk_code: u8, extended: bool) -> Result<(), SendKeyBoardInputError> {
         let input = build_key_down_input(vk_code, extended);
         execute_single_input(&input)
     }
 
     /// Release a key by VK code
-    pub fn release_with_vk(&self, vk_code: u8, extended: bool) -> Result<(), SendInputError> {
+    pub fn release_with_vk(&self, vk_code: u8, extended: bool) -> Result<(), SendKeyBoardInputError> {
         let input = build_key_up_input(vk_code, extended);
         execute_single_input(&input)
     }
 
     /// Click a key by VK code (press + release)
-    pub fn click_with_vk(&self, vk_code: u8, extended: bool) -> Result<(), SendInputError> {
+    pub fn click_with_vk(&self, vk_code: u8, extended: bool) -> Result<(), SendKeyBoardInputError> {
         let inputs = build_key_click_inputs(vk_code, extended);
         execute_inputs(&inputs)
     }

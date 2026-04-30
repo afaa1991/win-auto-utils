@@ -33,26 +33,65 @@ Add to your `Cargo.toml`:
 
 ```toml
 [dependencies]
-win-auto-utils = { version = "0.1.0", features = ["standard"] }
+win-auto-utils = { version = "0.2.0", features = ["standard"] }
 ```
 
 For full functionality including template matching:
 
 ```toml
 [dependencies]
-win-auto-utils = { version = "0.1.0", features = ["full"] }
+win-auto-utils = { version = "0.2.0", features = ["full"] }
 ```
 
 ## 🎯 Quick Start
 
 ### Process Management
 
-```rust
-use win_auto_utils::process::Process;
+**Only three types needed for full functionality!**
 
-let process = Process::builder("notepad.exe").build();
-process.init()?;
-println!("PID: {}", process.get_pid());
+```rust
+use win_auto_utils::process::{Process, ProcessConfig, ProcessManager};
+
+// Method 1: One-step initialization by name (most convenient)
+let mut process = Process::init_by_name("notepad.exe")?;
+println!("PID: {}", process.pid_or_default());
+
+// Method 2: One-step initialization by PID (when you know the PID)
+let process = Process::init_by_pid(12345)?;
+println!("HWND: {:?}", process.hwnd_or_default());
+
+// Method 3: Using Builder with intuitive methods (no enums needed!)
+let config = ProcessConfig::builder("target.exe")
+    .set_window_client_mode()  // Easy to remember - no DCMode enum!
+    .exclude_invisible()
+    .include_by_title("Game Window")
+    .build();
+let mut game = Process::new(config);
+game.init()?;
+
+// Method 4: Instance method init_with_pid (for existing Process objects)
+// Useful for distinguishing multiple instances of the same process
+let mut app = Process::by_name("target.exe");
+app.init()?;  // Initialize first instance
+// Later, switch to specific PID for second instance
+app.init_with_pid(20908)?;
+
+// Manager API (simple and straightforward):
+let mut manager = ProcessManager::new();
+manager.register("notepad.exe")?;  // process name becomes the key
+manager.register_alias("game", "target.exe")?;  // custom alias
+manager.init("notepad.exe")?;
+manager.init_with_pid("game", 12345)?;  // initialize with specific PID
+
+// Query processes (read-only, no mut needed)
+if let Some(proc) = manager.get("notepad.exe") {
+    println!("PID: {:?}", proc.pid());
+}
+
+// DC Mode Options (intuitive method names):
+// - .set_window_mode()        -> Standard window DC (GetWindowDC)
+// - .set_window_client_mode() -> Client area DC (GetDC) - best for games
+// - .set_desktop_mode()       -> Desktop DC for full-screen capture
 ```
 
 ### Memory Operations
@@ -258,21 +297,3 @@ cargo test --features "scripts_builtin"
 # Test memory operations
 cargo test --features "memory"
 ```
-
-## 🤝 Contributing
-
-Contributions are welcome! Please feel free to submit a Pull Request.
-
-## 📄 License
-
-This project is licensed under the MIT License - see the LICENSE file for details.
-
-## 🙏 Acknowledgments
-
-- Windows API bindings by [microsoft/windows-rs](https://github.com/microsoft/windows-rs)
-- Template matching algorithms from [image-rs/imageproc](https://github.com/image-rs/imageproc)
-- Community feedback and testing
-
----
-
-**Language**: [English](README.md) | [中文](docs/zh/README.md)

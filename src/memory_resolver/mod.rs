@@ -4,7 +4,5 @@
 //! into actual memory addresses in a target process.
 
 pub mod resolver;
-pub mod builder;
-
+mod builder; 
 pub use resolver::{MemoryAddress, AddressBase, AddressOp, ParseError, ResolveError, PointerSize};
-pub use builder::MemoryAddressBuilder;

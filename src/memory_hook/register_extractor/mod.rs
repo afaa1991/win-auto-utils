@@ -57,5 +57,4 @@ mod builder;
 mod extractor;
 
 pub use register::Register;
-pub use builder::RegisterExtractorBuilder;
 pub use extractor::RegisterExtractor;

@@ -3,7 +3,7 @@
 //! Implements the `scrollup` instruction for scrolling the mouse wheel upward.
 
 use super::{parse_mouse_mode, MouseMode, ScrollParams};
-use crate::mouse::send_input;
+use crate::mouse::mouse_input;
 use crate::script_engine::instruction::{
     InstructionData, InstructionHandler, InstructionMetadata, ScriptError,
 };
@@ -141,7 +141,7 @@ impl InstructionHandler for ScrollUpHandler {
         // OPTIMIZATION: Pre-build SINGLE SCROLL INPUT at parse time (delta=120 fixed)
         // Execute phase will loop N times to achieve N notches - zero runtime construction!
         let send_inputs = if mode == MouseMode::Send {
-            vec![send_input::build_scroll_up(120)] // Fixed delta, pre-built once
+            vec![mouse_input::build_scroll_up(120)] // Fixed delta, pre-built once
         } else {
             vec![]
         };
@@ -199,20 +199,20 @@ impl InstructionHandler for ScrollUpHandler {
 
                 // OPTIMIZATION: Use SetCursorPos for movement + pre-built scroll for execution
                 if let Some((screen_x, screen_y)) = screen_coords {
-                    send_input::set_cursor_pos(screen_x, screen_y).map_err(|e| {
+                    mouse_input::set_cursor_pos(screen_x, screen_y).map_err(|e| {
                         ScriptError::ExecutionError(format!("SetCursorPos failed: {:?}", e))
                     })?;
 
                     // Execute pre-built scroll INPUT N times (zero construction overhead)
                     for _ in 0..params.delta {
-                        send_input::execute_inputs(&params.send_inputs).map_err(|e| {
+                        mouse_input::execute_inputs(&params.send_inputs).map_err(|e| {
                             ScriptError::ExecutionError(format!("Scroll up failed: {:?}", e))
                         })?;
                     }
                 } else {
                     // No coordinates: execute pre-built scroll at current position N times
                     for _ in 0..params.delta {
-                        send_input::execute_inputs(&params.send_inputs).map_err(|e| {
+                        mouse_input::execute_inputs(&params.send_inputs).map_err(|e| {
                             ScriptError::ExecutionError(format!("Scroll up failed: {:?}", e))
                         })?;
                     }
@@ -221,7 +221,7 @@ impl InstructionHandler for ScrollUpHandler {
             MouseMode::Post => {
                 #[cfg(feature = "script_process_context")]
                 {
-                    use crate::mouse::post_message;
+                    use crate::mouse::mouse_message;
 
                     // Use provided coordinates or default to (0, 0)
                     let window_x = params.x.unwrap_or(0);
@@ -231,7 +231,7 @@ impl InstructionHandler for ScrollUpHandler {
                         super::convert_to_client_coords(vm, window_x, window_y)?;
                     // Execute scroll N times for PostMessage mode
                     for _ in 0..params.delta {
-                        post_message::post_scroll_up_atomic(
+                        mouse_message::post_scroll_up_atomic(
                             vm.process.get_hwnd_or_err()?,
                             client_x,
                             client_y,

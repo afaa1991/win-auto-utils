@@ -18,21 +18,21 @@
 //! mouse.click_left().unwrap();
 //! ```
 
-pub mod post_message;
-pub mod send_input;
+pub mod mouse_message;
+pub mod mouse_input;
 
 // Re-export main types for convenience
-pub use post_message::{PostMessageMouse, PostMessageError};
-pub use send_input::{SendInputMouse, SendInputError};
+pub use mouse_message::{PostMessageMouse, PostMessageMouseError};
+pub use mouse_input::{SendInputMouse, SendMouseInputError};
 
 // Re-export atomic high-performance functions
-pub use post_message::{
+pub use mouse_message::{
     post_click_left_atomic, post_click_right_atomic, post_click_middle_atomic,
     post_press_left_atomic, post_release_left_atomic,
     post_move_atomic, post_scroll_up_atomic, post_scroll_down_atomic,
 };
 
-pub use send_input::{
+pub use mouse_input::{
     execute_inputs as mouse_execute_inputs,
     execute_single_input as mouse_execute_single_input,
     build_mouse_input,

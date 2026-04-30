@@ -346,23 +346,10 @@ impl Drop for InlineHook {
     }
 }
 
-/// Builder for precise InlineHook configuration
+/// Builder for configuring InlineHook
 ///
-/// # Example
-/// ```no_run
-/// use win_auto_utils::memory_hook::{InlineHook, HookArchitecture};
-///
-/// let mut hook = InlineHook::builder()
-///     .handle(handle)
-///     .target_address(0x41FAF2)
-///     .detour_address(0x500000)
-///     .x86()
-///     .build()?;
-///
-/// hook.install()?;
-/// # Ok::<_, Box<dyn std::error::Error>>(())
-/// ```
-#[derive(Clone)]
+/// Provides a fluent API for building InlineHook with optional configuration.
+#[derive(Debug)]
 pub struct InlineHookBuilder {
     handle: Option<HANDLE>,
     target_address: Option<usize>,

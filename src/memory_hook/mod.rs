@@ -178,13 +178,12 @@ mod utils;
 #[cfg(feature = "memory_register_extractor")]
 pub mod register_extractor;
 
-pub use memory_lock::{MemoryLock, MemoryLockBuilder, AddressSource};
-pub use inline_hook::{InlineHook, InlineHookBuilder, HookArchitecture as InlineHookArchitecture};
+pub use memory_lock::{MemoryLock, AddressSource};
+pub use inline_hook::{InlineHook, HookArchitecture as InlineHookArchitecture};
 pub use trampoline_hook::TrampolineHook;
-pub use trampoline_hook::builder::TrampolineHookBuilder;
 pub use trampoline_hook::HookArchitecture as TrampolineHookArchitecture;
-pub use bytes_switch::{BytesSwitch, BytesSwitchBuilder};
-pub use shellcode::ShellcodeBuilder;
+pub use bytes_switch::BytesSwitch;
+pub use shellcode::{ShellcodeBuilder, Architecture};
 pub use utils::{ProtectionGuard, MemoryProtector};
 
 #[cfg(feature = "memory_register_extractor")]

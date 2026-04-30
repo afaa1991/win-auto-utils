@@ -4,9 +4,9 @@
 //! Performs press → delay (optional) → release sequence.
 
 use super::KeyParams;
-use crate::keyboard::send_input;
+use crate::keyboard::keyboard_input;
 #[cfg(feature = "script_process_context")]
-use crate::keyboard::post_message;
+use crate::keyboard::keyboard_message;
 use crate::script_engine::instruction::{
     InstructionData, InstructionHandler, InstructionMetadata, ScriptError,
 };
@@ -69,7 +69,7 @@ impl InstructionHandler for KeyClickHandler {
         if params.mode == KeyMode::Send {
             // For key_click: pre-build complete click sequence [KEYDOWN, KEYUP]
             params.send_inputs =
-                send_input::build_key_click_inputs(params.vk_code, params.extended).to_vec();
+                keyboard_input::build_key_click_inputs(params.vk_code, params.extended).to_vec();
         }
         // PostMessage mode keeps send_inputs empty
 
@@ -104,7 +104,7 @@ impl InstructionHandler for KeyClickHandler {
                     // params.send_inputs contains [down_input, up_input] (pre-built at parse time)
                     if params.send_inputs.len() >= 2 {
                         // Execute KEYDOWN (first input)
-                        send_input::execute_single_input(&params.send_inputs[0]).map_err(|e| {
+                        keyboard_input::execute_single_input(&params.send_inputs[0]).map_err(|e| {
                             ScriptError::ExecutionError(format!("SendInput press failed: {:?}", e))
                         })?;
 
@@ -112,7 +112,7 @@ impl InstructionHandler for KeyClickHandler {
                         sleep_ms(params.delay_ms);
 
                         // Execute KEYUP (second input)
-                        send_input::execute_single_input(&params.send_inputs[1]).map_err(|e| {
+                        keyboard_input::execute_single_input(&params.send_inputs[1]).map_err(|e| {
                             ScriptError::ExecutionError(format!(
                                 "SendInput release failed: {:?}",
                                 e
@@ -125,7 +125,7 @@ impl InstructionHandler for KeyClickHandler {
                     }
                 } else {
                     // No delay - execute pre-built inputs atomically (zero overhead)
-                    send_input::execute_inputs(&params.send_inputs).map_err(|e| {
+                    keyboard_input::execute_inputs(&params.send_inputs).map_err(|e| {
                         ScriptError::ExecutionError(format!("SendInput click failed: {:?}", e))
                     })?;
                 }
@@ -138,16 +138,16 @@ impl InstructionHandler for KeyClickHandler {
 
                     if params.delay_ms > 0 {
                         // Execute KEYDOWN
-                        post_message::post_key_down_atomic(hwnd, params.vk_code, params.scan_code);
+                        keyboard_message::post_key_down_atomic(hwnd, params.vk_code, params.scan_code);
 
                         // Apply delay using optimized utility function
                         sleep_ms(params.delay_ms);
 
                         // Execute KEYUP
-                        post_message::post_key_up_atomic(hwnd, params.vk_code, params.scan_code);
+                        keyboard_message::post_key_up_atomic(hwnd, params.vk_code, params.scan_code);
                     } else {
                         // No delay - atomic click
-                        post_message::post_key_click_atomic(hwnd, params.vk_code, params.scan_code);
+                        keyboard_message::post_key_click_atomic(hwnd, params.vk_code, params.scan_code);
                     }
                 }
 

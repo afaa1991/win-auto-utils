@@ -27,23 +27,10 @@ use windows::Win32::Foundation::HANDLE;
 use crate::memory::MemoryError;
 use super::BytesSwitch;
 
-/// Builder for precise BytesSwitch configuration
+/// Builder for configuring BytesSwitch
 ///
-/// # Example: Build-time specification
-/// ```no_run
-/// use win_auto_utils::memory_hook::BytesSwitch;
-///
-/// let mut switch = BytesSwitch::builder()
-///     .handle(handle)
-///     .target_address(0x41FAF2)
-///     .original_bytes(vec![0x01, 0x91, 0x08, 0x03, 0x00, 0x00])
-///     .patch_bytes(vec![0x90, 0x90, 0x90, 0x90, 0x90, 0x90])
-///     .build()?;
-///
-/// switch.enable()?;
-/// # Ok::<_, Box<dyn std::error::Error>>(())
-/// ```
-#[derive(Clone)]
+/// Provides a fluent API for building BytesSwitch with optional configuration.
+#[derive(Debug)]
 pub struct BytesSwitchBuilder {
     handle: Option<HANDLE>,
     target_address: Option<usize>,

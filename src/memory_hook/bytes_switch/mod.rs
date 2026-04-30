@@ -15,11 +15,9 @@
 //!
 //! # See Also
 //! - [`BytesSwitch`] - Core implementation with automatic state management
-//! - [`BytesSwitchBuilder`] - Builder pattern for precise control
 
 pub mod builder;
 
 mod switch;
 
 pub use switch::BytesSwitch;
-pub use builder::BytesSwitchBuilder;

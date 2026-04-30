@@ -78,6 +78,70 @@ pub fn get_process_pid(process_name: &str) -> Option<u32> {
     }
 }
 
+/// Find all process IDs by executable name
+///
+/// This function returns ALL processes matching the given name, which is useful
+/// for applications that can have multiple instances (e.g., notepad.exe).
+///
+/// # Arguments
+/// * `process_name` - The name of the executable (e.g., "notepad.exe")
+///
+/// # Returns
+/// A vector of process IDs. Empty if no matching processes found.
+///
+/// # Example
+/// ```no_run
+/// use win_auto_utils::snapshot::find_pids_by_name;
+///
+/// let pids = find_pids_by_name("notepad.exe");
+/// println!("Found {} Notepad processes", pids.len());
+/// for pid in pids {
+///     println!("  PID: {}", pid);
+/// }
+/// ```
+pub fn find_pids_by_name(process_name: &str) -> Vec<u32> {
+    let mut pids = Vec::new();
+
+    unsafe {
+        // Create a snapshot of all processes
+        let snapshot = match CreateToolhelp32Snapshot(TH32CS_SNAPPROCESS, 0) {
+            Ok(handle) => handle,
+            Err(_) => return pids,
+        };
+
+        let mut entry = PROCESSENTRY32::default();
+        entry.dwSize = std::mem::size_of::<PROCESSENTRY32>() as u32;
+
+        // Get the first process
+        if Process32First(snapshot, &mut entry).is_err() {
+            let _ = CloseHandle(snapshot);
+            return pids;
+        }
+
+        // Iterate through all processes
+        loop {
+            let name = char_array_to_string(&entry.szExeFile);
+
+            // Case-insensitive comparison
+            if name.eq_ignore_ascii_case(process_name) {
+                pids.push(entry.th32ProcessID);
+            }
+
+            // Clear the buffer before next iteration to prevent name overlap
+            entry.szExeFile.fill(0);
+
+            // Try to get the next process
+            if Process32Next(snapshot, &mut entry).is_err() {
+                break;
+            }
+        }
+
+        let _ = CloseHandle(snapshot);
+    }
+
+    pids
+}
+
 /// List all running processes with their PIDs and names
 ///
 /// # Returns

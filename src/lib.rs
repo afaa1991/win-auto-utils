@@ -2,6 +2,12 @@
 #[cfg(feature = "process")]
 pub mod process;
 
+// Re-export new process architecture components
+#[cfg(feature = "process")]
+pub use process::{
+    Process, ProcessConfig, ProcessManager,
+};
+
 #[cfg(feature = "hwnd")]
 pub mod hwnd;
 
@@ -78,9 +84,6 @@ pub mod script_engine;
 pub mod scripts_builtin;
 
 // === Re-exports for convenience ===
-#[cfg(feature = "process")]
-pub use process::Process;
-
 #[cfg(feature = "hwnd")]
 pub use hwnd::*;
 
@@ -100,5 +103,5 @@ pub use handle::*;
 #[cfg(feature = "keyboard")]
 pub use keyboard::*;
 
-#[cfg(all(feature = "mouse", not(feature = "keyboard")))]
+#[cfg(feature = "mouse")]
 pub use mouse::*;
