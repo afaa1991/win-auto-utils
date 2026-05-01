@@ -76,6 +76,8 @@ Process memory operations and advanced manipulation.
 | [`memory_resolver`](memory_resolver.md) | `memory_resolver` | Symbolic address resolution (e.g., "game.exe+0x123->456") |
 | [`memory_aobscan`](memory_aobscan.md) | `memory_aobscan` | Array-of-Bytes pattern scanning with SIMD acceleration |
 | [`memory_hook`](memory_hook.md) | `memory_hook` | Inline hooks and trampoline hooks for function interception |
+| [`memory_lock`](memory_lock.md) | `memory_lock` | Continuous monitoring and restoration of memory values (freeze effect) |
+| [`memory_manager`](memory_manager.md) | `memory_manager` | Unified memory modification manager with dynamic address resolution |
 | [`memory_register_extractor`](memory_hook.md) | `memory_register_extractor` | Automatic CPU register capture at hook points |
 
 **Use Cases:**
@@ -83,6 +85,7 @@ Process memory operations and advanced manipulation.
 - Resolve dynamic addresses from base pointers
 - Scan memory for unknown values (AOB scanning)
 - Hook functions to intercept calls or modify behavior
+- Manage multiple memory modification features uniformly (recommended: use memory_manager)
 - Extract register values for reverse engineering
 
 ---
@@ -190,15 +193,15 @@ full
 
 ## Choosing the Right Modules
 
-### For Game Automation
+### For Application Automation
 ```toml
 features = [
-    "process",        # Find game process
-    "memory",         # Read/write game state
-    "memory_hook",    # Intercept game functions
+    "process",        # Find target process
+    "memory",         # Read/write process state
+    "memory_manager", # Unified memory modification management
     "keyboard",       # Send key presses
     "mouse",          # Control mouse
-    "dxgi",           # Capture game screen
+    "dxgi",           # Capture screen
 ]
 ```
 
@@ -219,6 +222,7 @@ features = [
     "memory",              # Read process memory
     "memory_aobscan",      # Scan for patterns
     "memory_resolver",     # Resolve addresses
+    "memory_manager",      # Unified hook and lock management
     "memory_hook",         # Hook functions
     "memory_register_extractor", # Capture registers
     "dll_injector",        # Inject debugging DLLs
@@ -230,7 +234,7 @@ features = [
 features = [
     "script_engine",       # Run scripts
     "scripts_builtin",     # Use built-in commands
-    "keyboard",            # Key input
+    "keyboard",            # Keyboard input
     "mouse",               # Mouse control
 ]
 ```

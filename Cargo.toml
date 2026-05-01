@@ -1,6 +1,6 @@
 [package]
 name = "win-auto-utils"
-version = "0.2.0"
+version = "0.2.2"
 edition = "2021"
 description = "Universal Windows automation utilities with memory, window, input, and color operations"
 authors = ["CC"]
@@ -10,12 +10,7 @@ documentation = "https://docs.rs/win-auto-utils"
 readme = "README.md"
 keywords = ["windows", "automation", "memory", "input", "hook"]
 categories = ["os::windows-apis", "development-tools", "api-bindings"]
-exclude = [
-    ".git/*",
-    ".github/*",
-    "target/*",
-    "docs/*"
-]
+exclude = [".git/*", ".github/*", "target/*", "docs/*"]
 
 [lib]
 name = "win_auto_utils"
@@ -176,14 +171,27 @@ memory_resolver = ["memory", "snapshot"]
 # Memory AOB (Array of Bytes) scanning with SIMD acceleration
 memory_aobscan = ["memory", "snapshot", "dep:memchr", "dep:rayon"]
 
-# Memory hooking and manipulation (inline hooks, trampolines, memory locking)
+# Memory locking - Continuous monitoring and value restoration
+# Independent from memory_hook, provides freeze/lock functionality
+memory_lock = [
+    "memory",
+    "memory_resolver",                # For dynamic address resolution support
+    "dep:windows",
+    "windows/Win32_Foundation",
+    "windows/Win32_System_Threading", # For thread operations in background monitoring
+]
+
+# Memory hooking and manipulation (inline hooks, trampolines, bytes switching)
 memory_hook = [
     "memory",
     "dep:windows",
     "windows/Win32_Foundation",
     "windows/Win32_System_Memory",    # VirtualAllocEx, VirtualProtectEx, VirtualFreeEx
-    "windows/Win32_System_Threading", # For thread operations in memory lock
+    "windows/Win32_System_Threading", # For thread operations
 ]
+
+# Memory Manager - Unified interface for memory modifications (Locks, Hooks, etc.)
+memory_manager = ["memory_lock", "memory_hook", "memory_resolver"]
 
 # Register extractor - Automatic CPU register capture at hook points
 # Provides high-level API for extracting register values without complex pointer chains
@@ -285,7 +293,9 @@ standard = [
     "memory",
     "memory_resolver",
     "memory_aobscan",
+    "memory_lock",
     "memory_hook",
+    "memory_manager",
     "memory_register_extractor",
 
     # DLL injection module
@@ -316,13 +326,3 @@ full = [
 name = "dll_injection"
 path = "examples/dll_injection.rs"
 required-features = ["dll_injector", "snapshot"]
-
-[[example]]
-name = "template_matching"
-path = "examples/template_matching.rs"
-required-features = ["template_matcher", "snapshot"]
-
-[[example]]
-name = "template_matching_benchmark"
-path = "examples/template_matching_benchmark.rs"
-required-features = ["template_matcher", "snapshot"]

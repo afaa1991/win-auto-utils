@@ -36,6 +36,120 @@ impl Default for DCMode {
     }
 }
 
+/// Initialization flags for process resources
+///
+/// Controls which resources should be initialized during process initialization.
+/// This allows fine-grained control to avoid detection in security-sensitive applications.
+///
+/// # Example
+/// ```no_run
+/// use win_auto_utils::process::config::{InitFlags, ProcessConfig};
+///
+/// // Only initialize PID and HWND, skip handle and DC (less detectable)
+/// let flags = InitFlags::new()
+///     .with_pid(true)
+///     .with_hwnd(true)
+///     .with_handle(false)  // Skip process handle
+///     .with_dc(false);     // Skip device context
+///
+/// let config = ProcessConfig::builder("game.exe")
+///     .init_flags(flags)
+///     .build();
+/// ```
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct InitFlags {
+    /// Initialize process ID (always true, required for identification)
+    pub init_pid: bool,
+    /// Initialize window handle (HWND)
+    pub init_hwnd: bool,
+    /// Initialize process handle (HANDLE) - may trigger security detection
+    pub init_handle: bool,
+    /// Initialize device context (HDC) - may trigger security detection
+    pub init_dc: bool,
+}
+
+impl InitFlags {
+    /// Create new InitFlags with all resources enabled (default behavior)
+    pub fn new() -> Self {
+        Self {
+            init_pid: true,
+            init_hwnd: true,
+            init_handle: true,
+            init_dc: true,
+        }
+    }
+
+    /// Create InitFlags that only initializes PID (most minimal)
+    pub fn minimal() -> Self {
+        Self {
+            init_pid: true,
+            init_hwnd: false,
+            init_handle: false,
+            init_dc: false,
+        }
+    }
+
+    /// Create InitFlags for memory-only operations (PID + Handle, no GUI resources)
+    pub fn memory_only() -> Self {
+        Self {
+            init_pid: true,
+            init_hwnd: false,
+            init_handle: true,
+            init_dc: false,
+        }
+    }
+
+    /// Create InitFlags for GUI-only operations (PID + HWND + DC, no process handle)
+    pub fn gui_only() -> Self {
+        Self {
+            init_pid: true,
+            init_hwnd: true,
+            init_handle: false,
+            init_dc: true,
+        }
+    }
+
+    /// Set whether to initialize PID
+    pub fn with_pid(mut self, value: bool) -> Self {
+        self.init_pid = value;
+        self
+    }
+
+    /// Set whether to initialize HWND
+    pub fn with_hwnd(mut self, value: bool) -> Self {
+        self.init_hwnd = value;
+        self
+    }
+
+    /// Set whether to initialize process HANDLE
+    pub fn with_handle(mut self, value: bool) -> Self {
+        self.init_handle = value;
+        self
+    }
+
+    /// Set whether to initialize DC
+    pub fn with_dc(mut self, value: bool) -> Self {
+        self.init_dc = value;
+        self
+    }
+
+    /// Enable all initialization flags
+    pub fn all() -> Self {
+        Self::new()
+    }
+
+    /// Disable all optional initialization flags (only PID remains)
+    pub fn none() -> Self {
+        Self::minimal()
+    }
+}
+
+impl Default for InitFlags {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 /// Window filter rule type
 ///
 /// Determines whether a window should be included or excluded based on criteria.
@@ -62,7 +176,7 @@ pub enum FilterRuleType {
 ///     .include_by_title("Main Window");
 ///
 /// // Or use convenience constructors
-/// let filter = WindowFilter::exclude_invisible();
+/// let filter = WindowFilter::new_exclude_invisible();
 /// ```
 #[derive(Debug, Clone)]
 pub struct WindowFilter {
@@ -215,6 +329,7 @@ pub struct ProcessConfigBuilder {
     process_name: String,
     dc_mode: DCMode,
     window_filter: WindowFilter,
+    init_flags: InitFlags,
 }
 
 impl ProcessConfigBuilder {
@@ -224,6 +339,7 @@ impl ProcessConfigBuilder {
             process_name: process_name.to_string(),
             dc_mode: DCMode::default(),
             window_filter: WindowFilter::new(),
+            init_flags: InitFlags::default(),
         }
     }
     
@@ -326,6 +442,25 @@ impl ProcessConfigBuilder {
         self
     }
     
+    /// Set initialization flags for process resources
+    ///
+    /// Controls which resources (HWND, HANDLE, HDC) should be initialized.
+    /// Useful for avoiding detection in security-sensitive applications.
+    ///
+    /// # Example
+    /// ```no_run
+    /// use win_auto_utils::process::config::{ProcessConfig, InitFlags};
+    ///
+    /// // Minimal initialization - only PID and HWND
+    /// let config = ProcessConfig::builder("game.exe")
+    ///     .init_flags(InitFlags::minimal())
+    ///     .build();
+    /// ```
+    pub fn init_flags(mut self, flags: InitFlags) -> Self {
+        self.init_flags = flags;
+        self
+    }
+    
     /// Build the final ProcessConfig
     pub fn build(self) -> ProcessConfig {
         ProcessConfig {
@@ -336,6 +471,7 @@ impl ProcessConfigBuilder {
             } else {
                 Some(self.window_filter)
             },
+            init_flags: self.init_flags,
         }
     }
 }
@@ -368,6 +504,9 @@ pub struct ProcessConfig {
     
     /// Optional window filter for fine-grained selection
     pub window_filter: Option<WindowFilter>,
+    
+    /// Initialization flags controlling which resources to initialize
+    pub init_flags: InitFlags,
 }
 
 impl ProcessConfig {
@@ -377,6 +516,7 @@ impl ProcessConfig {
             process_name: process_name.to_string(),
             dc_mode: DCMode::default(),
             window_filter: None,
+            init_flags: InitFlags::default(),
         }
     }
     

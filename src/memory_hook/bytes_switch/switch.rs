@@ -15,10 +15,10 @@ use crate::memory_hook::utils::{ProtectionGuard, SendableHandle};
 /// replaces the original bytes at the target address.
 ///
 /// # Features
-/// - ✅ **Zero Overhead**: No memory allocation, no jump instructions, no trampoline
-/// - ✅ **Fast Switching**: Simple memory write operations
-/// - ✅ **Automatic Management**: RAII auto-restoration on drop
-/// - ✅ **State Tracking**: Prevents duplicate operations
+/// -  **Zero Overhead**: No memory allocation, no jump instructions, no trampoline
+/// -  **Fast Switching**: Simple memory write operations
+/// -  **Automatic Management**: RAII auto-restoration on drop
+/// -  **State Tracking**: Prevents duplicate operations
 ///
 /// # Example
 /// ```no_run

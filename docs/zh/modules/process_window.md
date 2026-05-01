@@ -121,6 +121,54 @@ let mut process = Process::new(config);
 process.init()?;
 ```
 
+## 自定义初始化标志（InitFlags）
+
+通过 `InitFlags` 可以精细控制进程初始化时获取哪些系统资源(HWND、HANDLE、HDC),根据不同的使用场景选择合适的初始化策略:
+
+```rust
+use win_auto_utils::process::{Process, ProcessConfig, InitFlags};
+
+// 策略 1：最简初始化（仅 PID，最低资源占用）
+let config = ProcessConfig::builder("app.exe")
+    .init_flags(InitFlags::minimal())
+    .build();
+
+// 策略 2：仅内存操作（PID + HANDLE，用于内存读写）
+let config = ProcessConfig::builder("app.exe")
+    .init_flags(InitFlags::memory_only())
+    .build();
+
+// 策略 3：仅 GUI 操作（PID + HWND + HDC，用于屏幕捕获）
+let config = ProcessConfig::builder("app.exe")
+    .init_flags(InitFlags::gui_only())
+    .build();
+
+// 策略 4：自定义配置（精细控制每个资源）
+let custom_flags = InitFlags::new()
+    .with_pid(true)
+    .with_hwnd(true)
+    .with_handle(false)  // 跳过进程句柄
+    .with_dc(false);     // 跳过设备上下文
+
+let config = ProcessConfig::builder("app.exe")
+    .init_flags(custom_flags)
+    .build();
+
+let mut process = Process::new(config);
+process.init()?;
+```
+
+### InitFlags 预设策略
+
+| 策略 | PID | HWND | HANDLE | HDC | 适用场景 |
+|------|-----|------|--------|-----|----------|
+| `InitFlags::new()` | ✓ | ✓ | ✓ | ✓ | 完全访问（默认） |
+| `InitFlags::minimal()` | ✓ | ✗ | ✗ | ✗ | 仅识别进程 |
+| `InitFlags::memory_only()` | ✓ | ✗ | ✓ | ✗ | 仅内存读写 |
+| `InitFlags::gui_only()` | ✓ | ✓ | ✗ | ✓ | 屏幕捕获/GUI 自动化 |
+
+更多详情参见 [InitFlags 使用指南](../process_init_flags.md)。
+
 ## 进程管理器（多进程管理）
 
 使用单个管理器管理多个进程：
@@ -144,8 +192,10 @@ if let Some(proc) = manager.get("notepad.exe") {
 }
 
 // 列出所有管理的进程
-for (name, proc) in manager.list_processes() {
-    println!("{}: PID={:?}", name, proc.pid());
+for name in manager.list_processes() {
+    if let Some(proc) = manager.get(&name) {
+        println!("{}: PID={:?}", name, proc.pid());
+    }
 }
 ```
 

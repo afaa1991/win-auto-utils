@@ -37,6 +37,7 @@ use std::collections::HashMap;
 ///
 /// // Cleanup happens automatically on drop
 /// ```
+#[derive(Debug)]
 pub struct ProcessManager {
     /// Registered process instances (key -> Process)
     processes: HashMap<String, Process>,

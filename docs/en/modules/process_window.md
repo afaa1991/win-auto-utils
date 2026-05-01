@@ -121,6 +121,54 @@ let mut process = Process::new(config);
 process.init()?;
 ```
 
+## Custom Initialization Flags (InitFlags)
+
+Use `InitFlags` to control which system resources (HWND, HANDLE, HDC) are initialized during process connection, allowing you to choose the right initialization strategy for different use cases:
+
+```rust
+use win_auto_utils::process::{Process, ProcessConfig, InitFlags};
+
+// Strategy 1: Minimal initialization (PID only, lowest resource usage)
+let config = ProcessConfig::builder("app.exe")
+    .init_flags(InitFlags::minimal())
+    .build();
+
+// Strategy 2: Memory-only operations (PID + HANDLE, for memory read/write)
+let config = ProcessConfig::builder("app.exe")
+    .init_flags(InitFlags::memory_only())
+    .build();
+
+// Strategy 3: GUI-only operations (PID + HWND + HDC, for screen capture)
+let config = ProcessConfig::builder("app.exe")
+    .init_flags(InitFlags::gui_only())
+    .build();
+
+// Strategy 4: Custom configuration (fine-grained control over each resource)
+let custom_flags = InitFlags::new()
+    .with_pid(true)
+    .with_hwnd(true)
+    .with_handle(false)  // Skip process handle
+    .with_dc(false);     // Skip device context
+
+let config = ProcessConfig::builder("app.exe")
+    .init_flags(custom_flags)
+    .build();
+
+let mut process = Process::new(config);
+process.init()?;
+```
+
+### InitFlags Preset Strategies
+
+| Strategy | PID | HWND | HANDLE | HDC | Use Case |
+|----------|-----|------|--------|-----|----------|
+| `InitFlags::new()` | ✓ | ✓ | ✓ | ✓ | Full access (default) |
+| `InitFlags::minimal()` | ✓ | ✗ | ✗ | ✗ | Process identification only |
+| `InitFlags::memory_only()` | ✓ | ✗ | ✓ | ✗ | Memory read/write only |
+| `InitFlags::gui_only()` | ✓ | ✓ | ✗ | ✓ | Screen capture/GUI automation |
+
+For more details, see [InitFlags Usage Guide](../process_init_flags.md).
+
 ## Process Manager (Multi-Process Management)
 
 Manage multiple processes with a single manager:
@@ -144,8 +192,10 @@ if let Some(proc) = manager.get("notepad.exe") {
 }
 
 // List all managed processes
-for (name, proc) in manager.list_processes() {
-    println!("{}: PID={:?}", name, proc.pid());
+for name in manager.list_processes() {
+    if let Some(proc) = manager.get(&name) {
+        println!("{}: PID={:?}", name, proc.pid());
+    }
 }
 ```
 

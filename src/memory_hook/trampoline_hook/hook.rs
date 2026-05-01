@@ -9,15 +9,9 @@
 use crate::memory::{read_memory_bytes, write_memory_bytes, MemoryError};
 use crate::memory_hook::shellcode::ShellcodeBuilder;
 use crate::memory_hook::utils::{ProtectionGuard, SendableHandle};
+use crate::memory_hook::Architecture;
 use windows::Win32::Foundation::HANDLE;
 use windows::Win32::System::Memory::{VirtualFreeEx, MEM_RELEASE};
-
-/// Architecture detection for hook generation
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum HookArchitecture {
-    X86,
-    X64,
-}
 
 /// Trampoline hook that preserves the original function
 ///
@@ -50,7 +44,7 @@ pub struct TrampolineHook {
     pub original_bytes: Vec<u8>,
     pub bytes_to_overwrite: usize,
     pub is_installed: bool,
-    pub architecture: HookArchitecture,
+    pub architecture: Architecture,
     pub skip_trampoline: bool,         // Skip trampoline generation, JMP directly to target+bytes
 }
 
@@ -75,20 +69,6 @@ impl TrampolineHook {
     /// hook.install()?;
     /// # Ok::<_, Box<dyn std::error::Error>>(())
     /// ```
-    pub fn x86(handle: HANDLE, target_address: usize, shellcode: Vec<u8>) -> Self {
-        let mut hook = Self::auto_new(handle, target_address, shellcode);
-        hook.architecture = HookArchitecture::X86;
-        hook
-    }
-
-    /// Quick constructor for x64 architecture with auto-allocated detour
-    ///
-    /// Similar to `x86()` but for 64-bit processes.
-    pub fn x64(handle: HANDLE, target_address: usize, shellcode: Vec<u8>) -> Self {
-        let mut hook = Self::auto_new(handle, target_address, shellcode);
-        hook.architecture = HookArchitecture::X64;
-        hook
-    }
 
     /// Create a builder for precise configuration
     /// All parameters are optional during construction - validation happens at build() time.
@@ -156,7 +136,7 @@ impl TrampolineHook {
             original_bytes: Vec::new(),
             bytes_to_overwrite: 0, // Will be auto-calculated based on architecture in install()
             is_installed: false,
-            architecture: HookArchitecture::X64,
+            architecture: Architecture::X64,
             skip_trampoline: false,
         }
     }
@@ -182,7 +162,7 @@ impl TrampolineHook {
     /// ```
     pub fn new_x86(handle: HANDLE, target_address: usize, shellcode: Vec<u8>) -> Self {
         let mut hook = Self::auto_new(handle, target_address, shellcode);
-        hook.architecture = HookArchitecture::X86;
+        hook.architecture = Architecture::X86;
         hook
     }
 
@@ -207,7 +187,7 @@ impl TrampolineHook {
     /// ```
     pub fn new_x64(handle: HANDLE, target_address: usize, shellcode: Vec<u8>) -> Self {
         let mut hook = Self::auto_new(handle, target_address, shellcode);
-        hook.architecture = HookArchitecture::X64;
+        hook.architecture = Architecture::X64;
         hook
     }
 
@@ -230,9 +210,9 @@ impl TrampolineHook {
     /// ```
     pub fn set_architecture(&mut self, is_64bit: bool) {
         self.architecture = if is_64bit {
-            HookArchitecture::X64
+            Architecture::X64
         } else {
-            HookArchitecture::X86
+            Architecture::X86
         };
 
         // Update default bytes_to_overwrite based on architecture
@@ -260,6 +240,26 @@ impl TrampolineHook {
     /// ```
     pub fn set_bytes_to_overwrite(&mut self, bytes: usize) {
         self.bytes_to_overwrite = bytes;
+    }
+
+    /// Enable or disable skip_trampoline mode
+    ///
+    /// When enabled, the detour will jump directly to target+bytes_to_overwrite
+    /// instead of going through a trampoline. This is useful when you want to
+    /// completely replace the original code without executing it.
+    ///
+    /// # Arguments
+    /// * `skip` - true to skip trampoline, false to use normal trampoline flow
+    ///
+    /// # Example
+    /// ```no_run
+    /// use win_auto_utils::memory_hook::TrampolineHook;
+    ///
+    /// let mut hook = TrampolineHook::auto_new(handle, 0x1000, shellcode);
+    /// hook.set_skip_trampoline(true); // Skip original code execution
+    /// ```
+    pub fn set_skip_trampoline(&mut self, skip: bool) {
+        self.skip_trampoline = skip;
     }
 
     /// Reset the hook to its initial state (safe for program restart)
@@ -339,8 +339,8 @@ impl TrampolineHook {
 
         // Step 1: Auto-calculate bytes_to_overwrite if not explicitly set
         let min_bytes = match self.architecture {
-            HookArchitecture::X86 => 5,   // Minimum for JMP rel32
-            HookArchitecture::X64 => 5,   // Minimum for JMP rel32 (will use absolute if needed)
+            Architecture::X86 => 5,   // Minimum for JMP rel32
+            Architecture::X64 => 5,   // Minimum for JMP rel32 (will use absolute if needed)
         };
 
         if self.bytes_to_overwrite == 0 {
@@ -448,11 +448,6 @@ impl TrampolineHook {
                 ));
             }
             
-            println!("[TrampolineHook] ✓ Safety check passed:");
-            println!("  Distance: {:.2} MB ({})", distance as f64 / 1024.0 / 1024.0,
-                     if distance <= 0x7FFF_FFFF { "relative jump OK" } else { "absolute jump needed" });
-            println!("  Jump size: {} bytes ≤ bytes_to_overwrite: {} bytes", required_jump_size, self.bytes_to_overwrite);
-            
             // Build complete detour code: shellcode + JMP to trampoline (or target)
             // (We'll add the JMP after we know trampoline/target address)
             write_memory_bytes(self.handle.0, detour_alloc, shellcode)?;
@@ -521,20 +516,7 @@ impl TrampolineHook {
             // Step 6: Build and write trampoline code
             let trampoline_code = self.build_trampoline_code(trampoline_addr)?;
             
-            println!("[TrampolineHook] Trampoline code length: {} bytes", trampoline_code.len());
-            println!("[TrampolineHook] Trampoline code: {:02X?}", trampoline_code);
-            
             write_memory_bytes(self.handle.0, trampoline_addr, &trampoline_code)?;
-            
-            // Verify written bytes
-            let verify_bytes = read_memory_bytes(self.handle.0, trampoline_addr, trampoline_code.len())?;
-            println!("[TrampolineHook] Verified written bytes: {:02X?}", verify_bytes);
-            
-            if verify_bytes != trampoline_code {
-                eprintln!("[TrampolineHook] ⚠️  WARNING: Written bytes don't match!");
-                eprintln!("[TrampolineHook] Expected: {:02X?}", trampoline_code);
-                eprintln!("[TrampolineHook] Actual:   {:02X?}", verify_bytes);
-            }
 
             trampoline_addr
         };
@@ -673,8 +655,8 @@ impl TrampolineHook {
     /// Build the trampoline code
     fn build_trampoline_code(&self, trampoline_addr: usize) -> Result<Vec<u8>, MemoryError> {
         let mut builder = match self.architecture {
-            HookArchitecture::X86 => ShellcodeBuilder::new_x86(),
-            HookArchitecture::X64 => ShellcodeBuilder::new_x64(),
+            Architecture::X86 => ShellcodeBuilder::new_x86(),
+            Architecture::X64 => ShellcodeBuilder::new_x64(),
         };
 
         // Copy original bytes
@@ -741,8 +723,8 @@ impl TrampolineHook {
     /// Generate jump code to detour function
     fn generate_jump_to_detour(&self) -> Result<Vec<u8>, MemoryError> {
         let mut builder = match self.architecture {
-            HookArchitecture::X86 => ShellcodeBuilder::new_x86(),
-            HookArchitecture::X64 => ShellcodeBuilder::new_x64(),
+            Architecture::X86 => ShellcodeBuilder::new_x86(),
+            Architecture::X64 => ShellcodeBuilder::new_x64(),
         };
 
         // Calculate distance to determine jump type

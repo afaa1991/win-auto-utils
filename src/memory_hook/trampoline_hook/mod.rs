@@ -25,4 +25,3 @@ mod hook;
 pub mod builder;
 
 pub use hook::TrampolineHook;
-pub use hook::HookArchitecture;

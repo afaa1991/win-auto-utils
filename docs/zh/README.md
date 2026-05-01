@@ -90,13 +90,52 @@ let mut capture = DxgiCapture::new()?;
 let image = capture.capture_window(hwnd)?;
 ```
 
-### 内存钩子
+### 内存钩子（推荐：使用内存管理器）
 
 ```rust
+use win_auto_utils::memory_manager::ModifierManager;
+use win_auto_utils::memory_manager::builtin::TrampolineHookHandler;
+use win_auto_utils::process::ProcessManager;
+
+// 初始化进程
+let mut process_mgr = ProcessManager::new();
+process_mgr.register("target_app.exe")?;
+process_mgr.init("target_app.exe")?;
+
+let proc = process_mgr.get("target_app.exe").unwrap();
+let handle = proc.handle().unwrap();
+let pid = proc.pid().unwrap();
+
+// 创建管理器并绑定上下文
+let mut manager = ModifierManager::new();
+manager.set_context(handle, pid);
+
+// 注册钩子和shellcode
+let shellcode = vec![0x90, 0x90]; // NOP指令
+let hook_handler = TrampolineHookHandler::new_x86_skip_trampoline(
+    "func_hook",
+    AddressSource::from_static_x86("target_app.exe+0x1000")?,
+    shellcode,
+    2,
+);
+manager.register("func_hook", hook_handler);
+
+// 激活钩子
+manager.activate("func_hook")?;
+
+// ... 触发钩子 ...
+
+// 停用（自动释放内存）
+manager.deactivate("func_hook")?;
+```
+
+**传统直接API**（仍然支持但不推荐）：
+
+```
 use win_auto_utils::memory_hook::TrampolineHook;
 
-let shellcode = vec![0x01, 0xD2]; // add edx, edx
-let mut hook = TrampolineHook::x86(handle, target_addr, shellcode);
+let shellcode = vec![0x90, 0x90]; // NOP指令
+let mut hook = TrampolineHook::new_x86(handle, target_addr, shellcode);
 hook.install()?;
 // ... 触发钩子 ...
 hook.uninstall()?; // 自动释放内存
@@ -131,6 +170,7 @@ engine.execute(script)?;
 #### 英文 (English)
 - [Modules Overview](docs/en/modules/overview.md) - 所有模块的高层视图
 - [Memory Operations](docs/en/modules/memory.md)
+- [Memory Manager](docs/en/modules/memory_manager.md) - 统一的内存修改管理器
 - [Memory Hooking](docs/en/modules/memory_hook.md)
 - [Address Resolution](docs/en/modules/memory_resolver.md)
 - [AOB Scanning](docs/en/modules/memory_aobscan.md)
@@ -144,6 +184,7 @@ engine.execute(script)?;
 #### 中文
 - [模块概览](docs/zh/modules/overview.md) - 所有模块的高层视图
 - [内存操作](docs/zh/modules/memory.md)
+- [内存管理器](docs/zh/modules/memory_manager.md) - 统一的内存修改管理器
 - [内存钩子](docs/zh/modules/memory_hook.md)
 - [地址解析](docs/zh/modules/memory_resolver.md)
 - [字节扫描](docs/zh/modules/memory_aobscan.md)

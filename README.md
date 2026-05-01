@@ -129,13 +129,52 @@ let mut capture = DxgiCapture::new()?;
 let image = capture.capture_window(hwnd)?;
 ```
 
-### Memory Hooking
+### Memory Hooking (Recommended: Using Memory Manager)
+
+```rust
+use win_auto_utils::memory_manager::ModifierManager;
+use win_auto_utils::memory_manager::builtin::TrampolineHookHandler;
+use win_auto_utils::process::ProcessManager;
+
+// Initialize process
+let mut process_mgr = ProcessManager::new();
+process_mgr.register("target_app.exe")?;
+process_mgr.init("target_app.exe")?;
+
+let proc = process_mgr.get("target_app.exe").unwrap();
+let handle = proc.handle().unwrap();
+let pid = proc.pid().unwrap();
+
+// Create manager and bind context
+let mut manager = ModifierManager::new();
+manager.set_context(handle, pid);
+
+// Register hook with shellcode
+let shellcode = vec![0x90, 0x90]; // NOP instruction
+let hook_handler = TrampolineHookHandler::new_x86_skip_trampoline(
+    "func_hook",
+    AddressSource::from_static_x86("target_app.exe+0x1000")?,
+    shellcode,
+    2,
+);
+manager.register("func_hook", hook_handler);
+
+// Activate hook
+manager.activate("func_hook")?;
+
+// ... trigger hook ...
+
+// Deactivate (auto-frees memory)
+manager.deactivate("func_hook")?;
+```
+
+**Legacy Direct API** (still supported but not recommended):
 
 ```rust
 use win_auto_utils::memory_hook::TrampolineHook;
 
 let shellcode = vec![0x01, 0xD2]; // add edx, edx
-let mut hook = TrampolineHook::x86(handle, target_addr, shellcode);
+let mut hook = TrampolineHook::new_x86(handle, target_addr, shellcode);
 hook.install()?;
 // ... trigger hook ...
 hook.uninstall()?; // Auto-frees memory
@@ -170,6 +209,7 @@ Comprehensive documentation is available in both English and Chinese:
 #### English
 - [Modules Overview](docs/en/modules/overview.md) - High-level view of all modules
 - [Memory Operations](docs/en/modules/memory.md)
+- [Memory Manager](docs/en/modules/memory_manager.md) - Unified memory modification manager
 - [Memory Hooking](docs/en/modules/memory_hook.md)
 - [Address Resolution](docs/en/modules/memory_resolver.md)
 - [AOB Scanning](docs/en/modules/memory_aobscan.md)
@@ -183,6 +223,7 @@ Comprehensive documentation is available in both English and Chinese:
 #### Chinese (中文)
 - [模块概览](docs/zh/modules/overview.md) - 所有模块的高层视图
 - [内存操作](docs/zh/modules/memory.md)
+- [内存管理器](docs/zh/modules/memory_manager.md) - 统一的内存修改管理器
 - [内存钩子](docs/zh/modules/memory_hook.md)
 - [地址解析](docs/zh/modules/memory_resolver.md)
 - [字节扫描](docs/zh/modules/memory_aobscan.md)

@@ -47,6 +47,7 @@ use windows::Win32::Foundation::HANDLE;
 use crate::memory::{read_memory_bytes, write_memory_bytes, MemoryError};
 use crate::memory_hook::shellcode::ShellcodeBuilder;
 use crate::memory_hook::utils::{ProtectionGuard, SendableHandle};
+use super::Architecture;
 
 /// Inline hook for redirecting function execution
 ///
@@ -76,14 +77,7 @@ pub struct InlineHook {
     detour_address: usize,
     original_bytes: Vec<u8>,
     is_installed: bool,
-    architecture: HookArchitecture,
-}
-
-/// Architecture detection for hook generation
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum HookArchitecture {
-    X86,
-    X64,
+    architecture: Architecture,
 }
 
 impl InlineHook {
@@ -91,7 +85,7 @@ impl InlineHook {
     ///
     /// # Example
     /// ```no_run
-    /// use win_auto_utils::memory_hook::{InlineHook, HookArchitecture};
+    /// use win_auto_utils::memory_hook::{InlineHook, Architecture};
     ///```
     pub fn builder() -> InlineHookBuilder {
         InlineHookBuilder::new()
@@ -123,7 +117,7 @@ impl InlineHook {
             detour_address,
             original_bytes: Vec::new(),
             is_installed: false,
-            architecture: HookArchitecture::X86,
+            architecture: Architecture::X86,
         }
     }
 
@@ -153,7 +147,7 @@ impl InlineHook {
             detour_address,
             original_bytes: Vec::new(),
             is_installed: false,
-            architecture: HookArchitecture::X64,
+            architecture: Architecture::X64,
         }
     }
 
@@ -186,9 +180,9 @@ impl InlineHook {
     /// * `is_64bit` - true for x64, false for x86
     pub fn set_architecture(&mut self, is_64bit: bool) {
         self.architecture = if is_64bit {
-            HookArchitecture::X64
+            Architecture::X64
         } else {
-            HookArchitecture::X86
+            Architecture::X86
         };
     }
 
@@ -250,8 +244,8 @@ impl InlineHook {
         
         // Determine how many bytes we need to overwrite
         let required_bytes = match self.architecture {
-            HookArchitecture::X86 => 5,  // JMP rel32
-            HookArchitecture::X64 => 14, // MOV RAX + JMP RAX (for absolute address)
+            Architecture::X86 => 5,  // JMP rel32
+            Architecture::X64 => 14, // MOV RAX + JMP RAX (for absolute address)
         };
         
         // Save original bytes
@@ -310,13 +304,13 @@ impl InlineHook {
     /// Generate the jump code based on architecture
     fn generate_jump_code(&self) -> Result<Vec<u8>, MemoryError> {
         let mut builder = match self.architecture {
-            HookArchitecture::X86 => ShellcodeBuilder::new_x86(),
-            HookArchitecture::X64 => ShellcodeBuilder::new_x64(),
+            Architecture::X86 => ShellcodeBuilder::new_x86(),
+            Architecture::X64 => ShellcodeBuilder::new_x64(),
         };
         
         // For x64 with large addresses, use absolute jump
         match self.architecture {
-            HookArchitecture::X86 => {
+            Architecture::X86 => {
                 // Try relative jump first
                 let offset = (self.detour_address as i64) - (self.target_address as i64) - 5;
                 
@@ -328,7 +322,7 @@ impl InlineHook {
                     builder.jmp_absolute(self.detour_address);
                 }
             }
-            HookArchitecture::X64 => {
+            Architecture::X64 => {
                 // Always use absolute jump for x64 to handle full 64-bit addresses
                 builder.jmp_absolute(self.detour_address);
             }
@@ -354,7 +348,7 @@ pub struct InlineHookBuilder {
     handle: Option<HANDLE>,
     target_address: Option<usize>,
     detour_address: Option<usize>,
-    architecture: Option<HookArchitecture>,
+    architecture: Option<Architecture>,
 }
 
 impl InlineHookBuilder {
@@ -386,19 +380,19 @@ impl InlineHookBuilder {
     }
 
     /// Set the target architecture
-    pub fn architecture(mut self, arch: HookArchitecture) -> Self {
+    pub fn architecture(mut self, arch: Architecture) -> Self {
         self.architecture = Some(arch);
         self
     }
 
     /// Convenience method for x86 architecture
     pub fn x86(self) -> Self {
-        self.architecture(HookArchitecture::X86)
+        self.architecture(Architecture::X86)
     }
 
     /// Convenience method for x64 architecture
     pub fn x64(self) -> Self {
-        self.architecture(HookArchitecture::X64)
+        self.architecture(Architecture::X64)
     }
 
     /// Build the InlineHook with configured settings
@@ -408,11 +402,7 @@ impl InlineHookBuilder {
     /// - `handle`: Process handle
     /// - `target_address`: Address to hook
     /// - `detour_address`: Address of replacement function
-    ///
-    /// # Errors
-    /// Returns error if any required parameter is missing.
     pub fn build(self) -> Result<InlineHook, MemoryError> {
-        // Validate required parameters
         let handle = self.handle.ok_or_else(|| {
             MemoryError::WriteFailed(
                 "handle must be set. Call .handle(handle) before build().".to_string()
@@ -437,7 +427,7 @@ impl InlineHookBuilder {
             detour_address,
             original_bytes: Vec::new(),
             is_installed: false,
-            architecture: self.architecture.unwrap_or(HookArchitecture::X64),
+            architecture: self.architecture.unwrap_or(Architecture::X64),
         })
     }
 }
@@ -465,6 +455,6 @@ mod tests {
         
         assert!(result.is_ok());
         let hook = result.unwrap();
-        assert_eq!(hook.architecture, HookArchitecture::X86);
+        assert_eq!(hook.architecture, Architecture::X86);
     }
 }

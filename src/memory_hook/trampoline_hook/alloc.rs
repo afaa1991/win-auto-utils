@@ -8,7 +8,7 @@
 //! within the trampoline_hook module.
 
 use crate::memory::MemoryError;
-use crate::memory_hook::trampoline_hook::hook::HookArchitecture;
+use crate::memory_hook::Architecture;
 use windows::Win32::Foundation::HANDLE;
 use windows::Win32::System::Memory::{
     VirtualAllocEx, MEM_COMMIT, MEM_RESERVE, PAGE_EXECUTE_READWRITE,
@@ -35,10 +35,10 @@ pub(super) fn allocate_detour_memory(
     handle: HANDLE,
     target_address: usize,
     size: usize,
-    architecture: HookArchitecture,
+    architecture: Architecture,
 ) -> Result<usize, MemoryError> {
     match architecture {
-        HookArchitecture::X86 => {
+        Architecture::X86 => {
             // For x86, direct allocation is sufficient (always within ±2GB)
             let allocated = unsafe {
                 VirtualAllocEx(
@@ -58,7 +58,7 @@ pub(super) fn allocate_detour_memory(
 
             Ok(allocated as usize)
         }
-        HookArchitecture::X64 => {
+        Architecture::X64 => {
             // For x64, try code cave approach first (allocate near target)
             let hint_distance = 0x1000_0000; // 256MB
             let hint_address = target_address.wrapping_sub(hint_distance);
@@ -120,10 +120,10 @@ pub(super) fn allocate_trampoline_nearby(
     handle: HANDLE,
     target_address: usize,
     size: usize,
-    architecture: HookArchitecture,
+    architecture: Architecture,
 ) -> Result<usize, MemoryError> {
     // For x86, direct allocation is sufficient (always within 32-bit address space)
-    if architecture == HookArchitecture::X86 {
+    if architecture == Architecture::X86 {
         return allocate_memory_direct(handle, size);
     }
 

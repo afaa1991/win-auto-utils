@@ -225,7 +225,7 @@ impl ShellcodeBuilder {
         self
     }
 
-    /// MOV [absolute_address], register (32-bit)
+    /// MOV `[absolute_address]`, register (32-bit)
     ///
     /// Stores a 32-bit register value to an absolute memory address.
     /// This method automatically handles both x86 and x64 architectures correctly.
@@ -286,7 +286,7 @@ impl ShellcodeBuilder {
         self
     }
 
-    /// MOV [absolute_address], register (x64, 64-bit)
+    /// MOV `[absolute_address]`, register (x64, 64-bit)
     ///
     /// Stores a 64-bit register value to an absolute memory address.
     /// Strategy: Use R11 as temporary pointer (safe because we're inside PUSH/POP context).

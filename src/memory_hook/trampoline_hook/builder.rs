@@ -42,8 +42,8 @@
 use windows::Win32::Foundation::HANDLE;
 
 use crate::memory::MemoryError;
-use super::{TrampolineHook, HookArchitecture};
-use crate::memory_hook::utils::SendableHandle;
+use super::TrampolineHook;
+use crate::memory_hook::{Architecture, utils::SendableHandle};
 
 /// Builder for configuring TrampolineHook
 ///
@@ -56,7 +56,7 @@ pub struct TrampolineHookBuilder {
     trampoline_address: Option<usize>,
     original_bytes: Option<Vec<u8>>,
     bytes_to_overwrite: Option<usize>,
-    architecture: Option<HookArchitecture>,
+    architecture: Option<Architecture>,
     skip_trampoline: bool,  // default: false (generate trampoline)
 }
 
@@ -145,19 +145,19 @@ impl TrampolineHookBuilder {
     }
 
     /// Set the target architecture
-    pub fn architecture(mut self, arch: HookArchitecture) -> Self {
+    pub fn architecture(mut self, arch: Architecture) -> Self {
         self.architecture = Some(arch);
         self
     }
 
     /// Convenience method for x86 architecture
     pub fn x86(self) -> Self {
-        self.architecture(HookArchitecture::X86)
+        self.architecture(Architecture::X86)
     }
 
     /// Convenience method for x64 architecture
     pub fn x64(self) -> Self {
-        self.architecture(HookArchitecture::X64)
+        self.architecture(Architecture::X64)
     }
 
     /// Skip automatic trampoline generation (Advanced)
@@ -234,9 +234,9 @@ impl TrampolineHookBuilder {
         })?;
 
         let bytes_to_overwrite = self.bytes_to_overwrite.unwrap_or_else(|| {
-            match self.architecture.unwrap_or(HookArchitecture::X64) {
-                HookArchitecture::X86 => 5,
-                HookArchitecture::X64 => 14,
+            match self.architecture.unwrap_or(Architecture::X64) {
+                Architecture::X86 => 5,
+                Architecture::X64 => 14,
             }
         });
 
@@ -249,7 +249,7 @@ impl TrampolineHookBuilder {
             original_bytes: self.original_bytes.unwrap_or_default(),
             bytes_to_overwrite,
             is_installed: false,
-            architecture: self.architecture.unwrap_or(HookArchitecture::X64),
+            architecture: self.architecture.unwrap_or(Architecture::X64),
             skip_trampoline: self.skip_trampoline,
         })
     }

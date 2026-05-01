@@ -47,14 +47,20 @@ pub mod clipboard;
 #[cfg(feature = "memory")]
 pub mod memory;
 
+#[cfg(feature = "memory_lock")]
+pub mod memory_lock;
+
+#[cfg(feature = "memory_hook")]
+pub mod memory_hook;
+
 #[cfg(feature = "memory_resolver")]
 pub mod memory_resolver;
 
 #[cfg(feature = "memory_aobscan")]
 pub mod memory_aobscan;
 
-#[cfg(feature = "memory_hook")]
-pub mod memory_hook;
+#[cfg(feature = "memory_manager")]
+pub mod memory_manager;
 
 // === Advanced Modules===
 #[cfg(feature = "dxgi")]

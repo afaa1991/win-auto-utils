@@ -21,21 +21,38 @@
 //!
 //! // Quick way: just specify the process name
 //! let mut process = Process::by_name("notepad.exe");
-//! process.init()?;
-//! println!("PID: {:?}", process.pid());
+//! if let Ok(_) = process.init() {
+//!     println!("PID: {:?}", process.pid());
+//! }
 //! ```
 //!
 //! ## Advanced Usage (With Builder)
 //! ```no_run
-//! use win_auto_utils::process::{Process, ProcessConfig, DCMode};
+//! use win_auto_utils::process::{Process, ProcessConfig};
 //!
 //! // Use builder for fluent configuration
 //! let config = ProcessConfig::builder("game.exe")
-//!     .dc_mode(DCMode::WindowClient)
+//!     .set_window_client_mode()
 //!     .exclude_invisible()
 //!     .build();
 //! let mut process = Process::new(config);
-//! process.init()?;
+//! if let Ok(_) = process.init() {
+//!     println!("Connected!");
+//! }
+//! ```
+//!
+//! ## Custom Initialization Flags
+//! ```no_run
+//! use win_auto_utils::process::{Process, ProcessConfig, InitFlags};
+//!
+//! // Control which resources are initialized based on your needs
+//! let config = ProcessConfig::builder("app.exe")
+//!     .init_flags(InitFlags::memory_only())  // Only PID + HANDLE for memory operations
+//!     .build();
+//! let mut process = Process::new(config);
+//! if let Ok(_) = process.init() {
+//!     println!("Ready for memory operations");
+//! }
 //! ```
 //!
 //! ## Manager Usage (Multiple Processes)
@@ -43,8 +60,8 @@
 //! use win_auto_utils::process::ProcessManager;
 //!
 //! let mut manager = ProcessManager::new();
-//! manager.register_by_name("game", "lf2.exe")?;
-//! manager.init("game")?;
+//! manager.register_alias("game", "lf2.exe").ok();
+//! manager.init("game").ok();
 //! ```
 
 pub mod config;
@@ -53,6 +70,6 @@ pub mod manager;
 mod process;
 
 // Re-export main types for convenience
-pub use config::{ProcessConfig, ProcessConfigBuilder, DCMode, WindowFilter, FilterRuleType, FilterCriterion};
+pub use config::{ProcessConfig, ProcessConfigBuilder, DCMode, WindowFilter, FilterRuleType, FilterCriterion, InitFlags};
 pub use manager::ProcessManager;
 pub use process::{Process, ProcessError, ProcessResult};

@@ -31,6 +31,7 @@
 - [模块概览](modules/overview.md) - 所有模块的高层视图
 - [内存操作](modules/memory.md) - 基础读写操作
 - [内存钩子](modules/memory_hook.md) - 函数拦截和寄存器提取
+- [内存锁定](modules/memory_lock.md) - 持续监控和恢复内存值
 - [地址解析](modules/memory_resolver.md) - 符号地址解析
 - [字节扫描](modules/memory_aobscan.md) - SIMD 模式扫描
 - [脚本引擎](modules/script_engine.md) - 自动化脚本解释器
@@ -42,13 +43,14 @@
 
 ## 🎯 按用例快速导航
 
-### 游戏自动化
-1. [进程管理](modules/process_window.md) - 查找游戏进程
-2. [内存操作](modules/memory.md) - 读写游戏状态
-3. [内存钩子](modules/memory_hook.md) - 拦截函数
-4. [字节扫描](modules/memory_aobscan.md) - 查找动态地址
-5. [输入控制](modules/input.md) - 模拟玩家操作
-6. [屏幕捕获](modules/dxgi.md) - 监控游戏画面
+### 应用程序自动化
+1. [进程管理](modules/process_window.md) - 查找目标进程
+2. [内存管理器](modules/memory_manager.md) - 统一管理多个功能（推荐）
+3. [内存操作](modules/memory.md) - 读写进程状态
+4. [内存钩子](modules/memory_hook.md) - 拦截函数
+5. [字节扫描](modules/memory_aobscan.md) - 查找动态地址
+6. [输入控制](modules/input.md) - 模拟用户操作
+7. [屏幕捕获](modules/dxgi.md) - 监控屏幕画面
 
 ### UI 测试
 1. [窗口管理](modules/process_window.md) - 控制应用程序窗口
@@ -60,9 +62,10 @@
 1. [内存操作](modules/memory.md) - 检查进程内存
 2. [字节扫描](modules/memory_aobscan.md) - 定位代码模式
 3. [地址解析](modules/memory_resolver.md) - 解析指针
-4. [内存钩子](modules/memory_hook.md) - 监控函数调用
-5. [寄存器提取](modules/memory_hook.md) - 捕获 CPU 状态
-6. [DLL注入](modules/dll_injector.md) - 注入调试工具
+4. [内存管理器](modules/memory_manager.md) - 统一管理钩子和锁定（推荐）
+5. [内存钩子](modules/memory_hook.md) - 监控函数调用
+6. [寄存器提取](modules/memory_hook.md) - 捕获 CPU 状态
+7. [DLL注入](modules/dll_injector.md) - 注入调试工具
 
 ### 桌面自动化
 1. [脚本引擎](modules/script_engine.md) - 创建自动化脚本

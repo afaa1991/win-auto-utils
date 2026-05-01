@@ -14,18 +14,19 @@ Welcome to the win-auto-utils documentation! This index helps you find the right
 
 ### Module Documentation
 
-#### English
-- [Modules Overview](modules/overview.md) - High-level view of all modules
-- [Memory Operations](modules/memory.md) - Basic read/write operations
-- [Memory Hooking](modules/memory_hook.md) - Function interception and register extraction
-- [Address Resolution](modules/memory_resolver.md) - Symbolic address parsing
-- [AOB Scanning](modules/memory_aobscan.md) - Pattern scanning with SIMD
-- [Script Engine](modules/script_engine.md) - Automation script interpreter
-- [Input Control](modules/input.md) - Keyboard and mouse simulation
-- [Process & Window](modules/process_window.md) - Process and window management
-- [Screen Capture](modules/dxgi.md) - DXGI-based capture
-- [Template Matching](modules/template_matcher.md) - Image-based UI detection
-- [DLL Injection](modules/dll_injector.md) - Cross-architecture injection
+#### 英文 (English)
+- [Modules Overview](modules/overview.md) - 所有模块的高层视图
+- [Memory Operations](modules/memory.md) - 基础读写操作
+- [Memory Hooking](modules/memory_hook.md) - 函数拦截和寄存器提取
+- [Memory Locking](modules/memory_lock.md) - 持续监控和恢复内存值
+- [Address Resolution](modules/memory_resolver.md) - 符号地址解析
+- [AOB Scanning](modules/memory_aobscan.md) - SIMD 模式扫描
+- [Script Engine](modules/script_engine.md) - 自动化脚本解释器
+- [Input Control](modules/input.md) - 键盘和鼠标模拟
+- [Process & Window](modules/process_window.md) - 进程和窗口管理
+- [Screen Capture](modules/dxgi.md) - 基于 DXGI 的捕获
+- [Template Matching](modules/template_matcher.md) - 基于图像的 UI 检测
+- [DLL Injection](modules/dll_injector.md) - 跨架构注入
 
 #### Chinese (中文)
 - [模块概览](modules/overview.md) - 所有模块的高层视图
@@ -42,13 +43,14 @@ Welcome to the win-auto-utils documentation! This index helps you find the right
 
 ## 🎯 Quick Navigation by Use Case
 
-### Game Automation
-1. [Process Management](modules/process_window.md) - Find game process
-2. [Memory Operations](modules/memory.md) - Read/write game state
-3. [Memory Hooking](modules/memory_hook.md) - Intercept functions
-4. [AOB Scanning](modules/memory_aobscan.md) - Find dynamic addresses
-5. [Input Control](modules/input.md) - Simulate player actions
-6. [Screen Capture](modules/dxgi.md) - Monitor game screen
+### Application Automation
+1. [Process Management](modules/process_window.md) - Find target process
+2. [Memory Manager](modules/memory_manager.md) - Unified feature management (recommended)
+3. [Memory Operations](modules/memory.md) - Read/write process state
+4. [Memory Hooking](modules/memory_hook.md) - Intercept functions
+5. [AOB Scanning](modules/memory_aobscan.md) - Find dynamic addresses
+6. [Input Control](modules/input.md) - Simulate user actions
+7. [Screen Capture](modules/dxgi.md) - Monitor screen
 
 ### UI Testing
 1. [Window Management](modules/process_window.md) - Control application windows
@@ -60,9 +62,10 @@ Welcome to the win-auto-utils documentation! This index helps you find the right
 1. [Memory Operations](modules/memory.md) - Examine process memory
 2. [AOB Scanning](modules/memory_aobscan.md) - Locate code patterns
 3. [Address Resolution](modules/memory_resolver.md) - Resolve pointers
-4. [Memory Hooking](modules/memory_hook.md) - Monitor function calls
-5. [Register Extraction](modules/memory_hook.md) - Capture CPU state
-6. [DLL Injection](modules/dll_injector.md) - Inject debugging tools
+4. [Memory Manager](modules/memory_manager.md) - Unified hook and lock management (recommended)
+5. [Memory Hooking](modules/memory_hook.md) - Monitor function calls
+6. [Register Extraction](modules/memory_hook.md) - Capture CPU state
+7. [DLL Injection](modules/dll_injector.md) - Inject debugging tools
 
 ### Desktop Automation
 1. [Script Engine](modules/script_engine.md) - Create automation scripts

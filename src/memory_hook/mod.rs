@@ -1,7 +1,6 @@
 //! Memory Hook Module
 //!
 //! Provides memory manipulation capabilities including:
-//! - Memory locking (continuous monitoring and restoration)
 //! - Inline hooking (redirect function calls)
 //! - Trampoline hooking (preserve original function while hooking)
 //! - Bytes switching (quick enable/disable of byte sequences)
@@ -11,38 +10,6 @@
 //! Enable with: `--features "memory_hook"`
 //!
 //! # Quick Start
-//!
-//! ## Memory Lock Example
-//! ```no_run
-//! use win_auto_utils::memory_hook::MemoryLock;
-//! use win_auto_utils::handle::open_process_handle;
-//! use windows::Win32::System::Threading::{PROCESS_VM_READ, PROCESS_VM_WRITE, PROCESS_VM_OPERATION};
-//!
-//! fn main() -> Result<(), Box<dyn std::error::Error>> {
-//!     let pid = 12345;
-//!     let address = 0x7FF6A1B2C3D4;
-//!     
-//!     let handle = open_process_handle(pid, 
-//!         PROCESS_VM_READ | PROCESS_VM_WRITE | PROCESS_VM_OPERATION)
-//!         .ok_or("Failed to open process")?;
-//!     
-//!     // Lock a value (e.g., health = 100)
-//!     let mut lock = MemoryLock::builder()
-//!         .handle(handle)
-//!         .address(address)
-//!         .value(100u32)
-//!         .build()?;
-//!     lock.start()?;
-//!     
-//!     // The value will be continuously restored to 100
-//!     // ... your code here ...
-//!     
-//!     // Stop locking
-//!     lock.stop()?;
-//!     
-//!     Ok(())
-//! }
-//! ```
 //!
 //! ## Inline Hook Example
 //! ```no_run
@@ -168,7 +135,6 @@
 //! }
 //! ```
 
-mod memory_lock;
 mod inline_hook;
 mod trampoline_hook;
 mod bytes_switch;
@@ -178,10 +144,8 @@ mod utils;
 #[cfg(feature = "memory_register_extractor")]
 pub mod register_extractor;
 
-pub use memory_lock::{MemoryLock, AddressSource};
-pub use inline_hook::{InlineHook, HookArchitecture as InlineHookArchitecture};
+pub use inline_hook::InlineHook;
 pub use trampoline_hook::TrampolineHook;
-pub use trampoline_hook::HookArchitecture as TrampolineHookArchitecture;
 pub use bytes_switch::BytesSwitch;
 pub use shellcode::{ShellcodeBuilder, Architecture};
 pub use utils::{ProtectionGuard, MemoryProtector};

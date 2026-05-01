@@ -127,8 +127,9 @@ impl Process {
     ///
     /// // Two-step initialization
     /// let mut process = Process::by_name("notepad.exe");
-    /// process.init()?;
-    /// println!("PID: {:?}", process.pid());
+    /// if let Ok(_) = process.init() {
+    ///     println!("PID: {:?}", process.pid());
+    /// }
     /// ```
     pub fn by_name(process_name: &str) -> Self {
         let config = ProcessConfig::new(process_name);
@@ -152,8 +153,9 @@ impl Process {
     /// use win_auto_utils::process::Process;
     ///
     /// // One-step initialization (recommended for simple cases)
-    /// let mut process = Process::init_by_name("notepad.exe")?;
-    /// println!("PID: {}", process.pid().unwrap());
+    /// if let Ok(mut process) = Process::init_by_name("notepad.exe") {
+    ///     println!("PID: {}", process.pid().unwrap());
+    /// }
     /// ```
     pub fn init_by_name(process_name: &str) -> ProcessResult<Self> {
         let mut process = Self::by_name(process_name);
@@ -179,10 +181,11 @@ impl Process {
     /// use win_auto_utils::process::Process;
     ///
     /// // Quick initialization by known PID (e.g., from Task Manager)
-    /// let process = Process::init_by_pid(12345)?;
-    /// println!("PID: {}", process.pid().unwrap());
-    /// println!("HWND: {:?}", process.hwnd().unwrap());
-    /// println!("Handle: {:?}", process.handle().unwrap());
+    /// if let Ok(process) = Process::init_by_pid(12345) {
+    ///     println!("PID: {}", process.pid().unwrap());
+    ///     println!("HWND: {:?}", process.hwnd().unwrap());
+    ///     println!("Handle: {:?}", process.handle().unwrap());
+    /// }
     /// ```
     pub fn init_by_pid(pid: u32) -> ProcessResult<Self> {
         // Create a minimal config with empty name (will be bypassed anyway)
@@ -213,17 +216,17 @@ impl Process {
 
     /// Get the window handle (if initialized)
     pub fn hwnd(&self) -> Option<HWND> {
-        self.state.as_ref().map(|s| s.hwnd)
+        self.state.as_ref().and_then(|s| s.hwnd)
     }
 
     /// Get the process handle (if initialized)
     pub fn handle(&self) -> Option<HANDLE> {
-        self.state.as_ref().map(|s| s.handle)
+        self.state.as_ref().and_then(|s| s.handle)
     }
 
     /// Get the device context (if initialized)
     pub fn hdc(&self) -> Option<HDC> {
-        self.state.as_ref().map(|s| s.hdc)
+        self.state.as_ref().and_then(|s| s.hdc)
     }
 
     // ==================== Convenient Accessors with Defaults ====================
@@ -321,6 +324,7 @@ impl Process {
     /// Initialize the process using the configured lookup strategy
     ///
     /// This method searches for the process based on the configuration.
+    /// Resource initialization is controlled by InitFlags in the config.
     ///
     /// # Returns
     /// * `Ok(())` - Successfully initialized
@@ -346,17 +350,29 @@ impl Process {
         // Find process based on configuration
         let (pid, hwnd) = self.find_process()?;
 
-        // Open process handle
-        let handle =
-            open_process_rw_handle(pid).ok_or_else(|| ProcessError::HandleOpenFailed(pid))?;
+        // Initialize resources based on flags
+        let handle = if self.config.init_flags.init_handle {
+            Some(open_process_rw_handle(pid).ok_or_else(|| ProcessError::HandleOpenFailed(pid))?)
+        } else {
+            None
+        };
 
-        // Create device context
-        let hdc = self.create_dc(hwnd)?;
+        let hdc = if self.config.init_flags.init_dc && self.config.init_flags.init_hwnd {
+            Some(self.create_dc(hwnd)?)
+        } else {
+            None
+        };
+
+        let hwnd_opt = if self.config.init_flags.init_hwnd {
+            Some(hwnd)
+        } else {
+            None
+        };
 
         // Store state
         self.state = Some(ProcessState {
             pid,
-            hwnd,
+            hwnd: hwnd_opt,
             handle,
             hdc,
         });
@@ -373,6 +389,7 @@ impl Process {
     ///
     /// This bypasses the configured lookup strategy and uses the provided PID directly.
     /// Useful when you know the exact PID (e.g., from task manager).
+    /// Resource initialization is controlled by InitFlags in the config.
     ///
     /// # Arguments
     /// * `pid` - The process ID to connect to
@@ -395,15 +412,25 @@ impl Process {
             self.cleanup()?;
         }
 
-        // Find window for this PID
-        let hwnd = self.find_window_for_pid(pid)?;
+        // Find window for this PID (only if needed)
+        let hwnd = if self.config.init_flags.init_hwnd || self.config.init_flags.init_dc {
+            Some(self.find_window_for_pid(pid)?)
+        } else {
+            None
+        };
 
-        // Open process handle
-        let handle =
-            open_process_rw_handle(pid).ok_or_else(|| ProcessError::HandleOpenFailed(pid))?;
+        // Initialize resources based on flags
+        let handle = if self.config.init_flags.init_handle {
+            Some(open_process_rw_handle(pid).ok_or_else(|| ProcessError::HandleOpenFailed(pid))?)
+        } else {
+            None
+        };
 
-        // Create device context
-        let hdc = self.create_dc(hwnd)?;
+        let hdc = if self.config.init_flags.init_dc && hwnd.is_some() {
+            Some(self.create_dc(hwnd.unwrap())?)
+        } else {
+            None
+        };
 
         // Store state
         self.state = Some(ProcessState {

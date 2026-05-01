@@ -76,6 +76,8 @@
 | [`memory_resolver`](memory_resolver.md) | `memory_resolver` | 符号地址解析（例如 "game.exe+0x123->456"） |
 | [`memory_aobscan`](memory_aobscan.md) | `memory_aobscan` | 字节数组模式扫描，支持 SIMD 加速 |
 | [`memory_hook`](memory_hook.md) | `memory_hook` | 内联钩子和蹦床钩子，用于函数拦截 |
+| [`memory_lock`](memory_lock.md) | `memory_lock` | 持续监控和恢复内存值（冻结效果） |
+| [`memory_manager`](memory_manager.md) | `memory_manager` | 统一的内存修改管理器，支持动态地址解析 |
 | [`memory_register_extractor`](memory_hook.md) | `memory_register_extractor` | 在钩子点自动捕获 CPU 寄存器值 |
 
 **使用场景：**
@@ -83,6 +85,7 @@
 - 从基址指针解析动态地址
 - 扫描未知值的内存（AOB 扫描）
 - 钩住函数以拦截调用或修改行为
+- 统一管理多个内存修改功能（推荐使用memory_manager）
 - 提取寄存器值用于逆向工程
 
 ---
@@ -190,15 +193,15 @@ full
 
 ## 选择合适的模块
 
-### 游戏自动化
+### 应用程序自动化
 ```toml
 features = [
-    "process",        # 查找游戏进程
-    "memory",         # 读写游戏状态
-    "memory_hook",    # 拦截游戏函数
+    "process",        # 查找目标进程
+    "memory",         # 读写进程状态
+    "memory_manager", # 统一管理内存修改
     "keyboard",       # 发送按键
     "mouse",          # 控制鼠标
-    "dxgi",           # 捕获游戏画面
+    "dxgi",           # 捕获屏幕画面
 ]
 ```
 
@@ -219,6 +222,7 @@ features = [
     "memory",              # 读取进程内存
     "memory_aobscan",      # 扫描模式
     "memory_resolver",     # 解析地址
+    "memory_manager",      # 统一管理钩子和锁定
     "memory_hook",         # 钩住函数
     "memory_register_extractor", # 捕获寄存器
     "dll_injector",        # 注入调试 DLL
