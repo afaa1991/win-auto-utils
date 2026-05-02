@@ -25,37 +25,41 @@ pub const LOOP_STACK_KEY: &str = "__builtin_loop_stack";
 
 /// Initialize loop terminator registration (call once at startup)
 pub fn init_loop_terminator() {
-    TerminatorHandler::register_handler("loop", |vm: &mut VMContext, _metadata: &TerminatorMetadata| {
-        // Get loop stack from VM execution state
-        let loop_stack = vm.get_or_create_execution_state::<Vec<LoopRuntimeState>>(LOOP_STACK_KEY);
+    TerminatorHandler::register_handler(
+        "loop",
+        |vm: &mut VMContext, _metadata: &TerminatorMetadata| {
+            // Get loop stack from VM execution state
+            let loop_stack =
+                vm.get_or_create_execution_state::<Vec<LoopRuntimeState>>(LOOP_STACK_KEY);
 
-        // Check the current loop state (peek without popping)
-        if let Some(loop_state) = loop_stack.last_mut() {
-            // Check if loop should continue
-            let should_continue = match &loop_state.remaining {
-                Some(count) => *count > 1,
-                None => true, // Infinite loop
-            };
+            // Check the current loop state (peek without popping)
+            if let Some(loop_state) = loop_stack.last_mut() {
+                // Check if loop should continue
+                let should_continue = match &loop_state.remaining {
+                    Some(count) => *count > 1,
+                    None => true, // Infinite loop
+                };
 
-            if should_continue {
-                // Decrement counter
-                if let Some(ref mut count) = loop_state.remaining {
-                    *count -= 1;
+                if should_continue {
+                    // Decrement counter
+                    if let Some(ref mut count) = loop_state.remaining {
+                        *count -= 1;
+                    }
+
+                    // Jump back to loop body
+                    Ok(loop_state.start_ip + 1)
+                } else {
+                    // Loop finished, pop and continue after 'end'
+                    loop_stack.pop();
+                    Ok(vm.ip + 1)
                 }
-
-                // Jump back to loop body
-                Ok(loop_state.start_ip + 1)
             } else {
-                // Loop finished, pop and continue after 'end'
-                loop_stack.pop();
-                Ok(vm.ip + 1)
+                Err(ScriptError::ExecutionError(
+                    "Loop end without active loop".into(),
+                ))
             }
-        } else {
-            Err(ScriptError::ExecutionError(
-                "Loop end without active loop".into(),
-            ))
-        }
-    });
+        },
+    );
 }
 
 /// Loop handler - start a loop block

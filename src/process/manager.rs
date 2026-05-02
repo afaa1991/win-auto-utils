@@ -25,7 +25,7 @@ use std::collections::HashMap;
 ///
 /// // Phase 1: Register configurations
 /// manager.register("notepad.exe").ok();
-/// manager.register_alias("game", "lf2.exe").ok();
+/// manager.register_alias("game", "app.exe").ok();
 ///
 /// // Phase 2: Initialize selectively
 /// manager.init("notepad.exe").ok();
@@ -45,16 +45,16 @@ pub struct ProcessManager {
 
 impl ProcessManager {
     // ==================== Constructor ====================
-    
+
     /// Create a new empty process manager
     pub fn new() -> Self {
         Self {
             processes: HashMap::new(),
         }
     }
-    
+
     // ==================== Registration Methods ====================
-    
+
     /// Register a process by its executable name (process name becomes the key)
     ///
     /// This is the simplest way to register a process. The process name (e.g., "notepad.exe")
@@ -80,20 +80,20 @@ impl ProcessManager {
         if self.processes.contains_key(process_name) {
             return Err(ProcessError::DuplicateName(process_name.to_string()));
         }
-        
+
         let config = ProcessConfig::new(process_name);
         let process = Process::new(config);
         self.processes.insert(process_name.to_string(), process);
         Ok(())
     }
-    
+
     /// Register a process with a custom alias/key
     ///
     /// Use this when you want to use a friendly name instead of the actual process name.
     ///
     /// # Arguments
     /// * `key` - Your custom identifier (e.g., "game", "editor")
-    /// * `process_name` - The executable name to search for (e.g., "lf2.exe")
+    /// * `process_name` - The executable name to search for (e.g., "app.exe")
     ///
     /// # Returns
     /// * `Ok(())` - Successfully registered
@@ -104,7 +104,7 @@ impl ProcessManager {
     /// use win_auto_utils::process::ProcessManager;
     ///
     /// let mut manager = ProcessManager::new();
-    /// manager.register_alias("game", "lf2.exe").ok();
+    /// manager.register_alias("game", "app.exe").ok();
     /// // Now you can use "game" as the key
     /// manager.init("game").ok();
     /// ```
@@ -112,13 +112,13 @@ impl ProcessManager {
         if self.processes.contains_key(key) {
             return Err(ProcessError::DuplicateName(key.to_string()));
         }
-        
+
         let config = ProcessConfig::new(process_name);
         let process = Process::new(config);
         self.processes.insert(key.to_string(), process);
         Ok(())
     }
-    
+
     /// Register a process using a full ProcessConfig
     ///
     /// This allows you to register a process with advanced configuration options
@@ -149,16 +149,16 @@ impl ProcessManager {
     /// ```
     pub fn register_config(&mut self, config: ProcessConfig) -> ProcessResult<()> {
         let process_name = config.process_name.clone();
-        
+
         if self.processes.contains_key(&process_name) {
             return Err(ProcessError::DuplicateName(process_name));
         }
-        
+
         let process = Process::new(config);
         self.processes.insert(process_name, process);
         Ok(())
     }
-    
+
     /// Register a process using a full ProcessConfig with a custom alias
     ///
     /// Similar to `register_config()`, but allows you to specify a custom key/name
@@ -192,12 +192,12 @@ impl ProcessManager {
         if self.processes.contains_key(key) {
             return Err(ProcessError::DuplicateName(key.to_string()));
         }
-        
+
         let process = Process::new(config);
         self.processes.insert(key.to_string(), process);
         Ok(())
     }
-    
+
     /// Unregister a process (cleans up resources first)
     ///
     /// # Arguments
@@ -214,14 +214,14 @@ impl ProcessManager {
         }
         Ok(())
     }
-    
+
     /// Check if a process is registered
     pub fn is_registered(&self, key: &str) -> bool {
         self.processes.contains_key(key)
     }
 
     // ==================== Initialization Methods ====================
-    
+
     /// Initialize a registered process using its configured lookup strategy
     ///
     /// # Arguments
@@ -245,7 +245,7 @@ impl ProcessManager {
         }
         Ok(())
     }
-    
+
     /// Initialize a registered process by specifying a PID directly
     ///
     /// This bypasses the configured lookup strategy and uses the provided PID.
@@ -273,7 +273,7 @@ impl ProcessManager {
         }
         Ok(())
     }
-    
+
     /// Re-initialize a registered process
     pub fn reinit(&mut self, key: &str) -> ProcessResult<()> {
         if let Some(proc) = self.processes.get_mut(key) {
@@ -283,9 +283,9 @@ impl ProcessManager {
         }
         Ok(())
     }
-    
+
     // ==================== Cleanup Methods ====================
-    
+
     /// Clean up a specific process's runtime resources
     pub fn cleanup(&mut self, key: &str) -> ProcessResult<()> {
         if let Some(proc) = self.processes.get_mut(key) {
@@ -295,7 +295,7 @@ impl ProcessManager {
         }
         Ok(())
     }
-    
+
     /// Clean up all registered processes
     pub fn cleanup_all(&mut self) -> ProcessResult<()> {
         for proc in self.processes.values_mut() {
@@ -303,22 +303,23 @@ impl ProcessManager {
         }
         Ok(())
     }
-    
+
     // ==================== Query Methods ====================
-    
+
     /// Get an immutable reference to a registered process
     pub fn get(&self, key: &str) -> Option<&Process> {
         self.processes.get(key)
     }
-    
+
     /// List all registered process keys
     pub fn list_processes(&self) -> Vec<String> {
         self.processes.keys().cloned().collect()
     }
-    
+
     /// Get all valid (initialized) processes
     pub fn get_all_valid(&self) -> Vec<(String, bool)> {
-        self.processes.iter()
+        self.processes
+            .iter()
             .filter(|(_, p)| p.is_valid())
             .map(|(name, proc)| (name.clone(), proc.is_valid()))
             .collect()

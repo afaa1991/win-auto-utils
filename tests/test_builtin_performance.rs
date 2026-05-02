@@ -44,9 +44,9 @@
 //! }
 //! ```
 
+use win_auto_utils::script_engine::instruction::InstructionRegistry;
 use win_auto_utils::script_engine::{ScriptConfig, ScriptEngine};
 use win_auto_utils::scripts_builtin::register_all;
-use win_auto_utils::script_engine::instruction::InstructionRegistry;
 
 /// Helper function to create an engine with all builtin instructions
 fn create_engine() -> ScriptEngine {
@@ -84,17 +84,20 @@ sleep 5
 "#;
 
     println!("\n=== Test: Single Loop with Continue ===");
-    
+
     let compile_time = measure_compile(&engine, script);
     println!("Compilation time: {:?}", compile_time);
-    
+
     let exec_time = measure_execution(&engine, script);
     println!("Execution time: {:?}", exec_time);
-    
+
     // Verify no infinite loop (should complete in reasonable time)
-    assert!(exec_time < std::time::Duration::from_millis(100), 
-            "Execution took too long: {:?} (possible infinite loop)", exec_time);
-    
+    assert!(
+        exec_time < std::time::Duration::from_millis(100),
+        "Execution took too long: {:?} (possible infinite loop)",
+        exec_time
+    );
+
     println!("✅ Test passed - No infinite loop detected\n");
 }
 
@@ -111,18 +114,21 @@ sleep 5
 "#;
 
     println!("\n=== Test: Multiple Iterations with Continue ===");
-    
+
     let compile_time = measure_compile(&engine, script);
     println!("Compilation time: {:?}", compile_time);
-    
+
     let exec_time = measure_execution(&engine, script);
     println!("Execution time: {:?}", exec_time);
-    
+
     // Expected: ~35ms (3 × 10ms + 5ms)
     // If continue doesn't work: ~305ms (3 × 110ms + 5ms)
-    assert!(exec_time < std::time::Duration::from_millis(100),
-            "Continue may not be working properly. Execution time: {:?}", exec_time);
-    
+    assert!(
+        exec_time < std::time::Duration::from_millis(100),
+        "Continue may not be working properly. Execution time: {:?}",
+        exec_time
+    );
+
     println!("✅ Test passed - Continue works correctly\n");
 }
 
@@ -139,17 +145,20 @@ sleep 5
 "#;
 
     println!("\n=== Test: Loop with Break ===");
-    
+
     let compile_time = measure_compile(&engine, script);
     println!("Compilation time: {:?}", compile_time);
-    
+
     let exec_time = measure_execution(&engine, script);
     println!("Execution time: {:?}", exec_time);
-    
+
     // Expected: ~15ms (1 iteration only due to break)
-    assert!(exec_time < std::time::Duration::from_millis(50),
-            "Break may not be working properly. Execution time: {:?}", exec_time);
-    
+    assert!(
+        exec_time < std::time::Duration::from_millis(50),
+        "Break may not be working properly. Execution time: {:?}",
+        exec_time
+    );
+
     println!("✅ Test passed - Break works correctly\n");
 }
 
@@ -167,17 +176,20 @@ sleep 5
 "#;
 
     println!("\n=== Test: Nested Loops ===");
-    
+
     let compile_time = measure_compile(&engine, script);
     println!("Compilation time: {:?}", compile_time);
-    
+
     let exec_time = measure_execution(&engine, script);
     println!("Execution time: {:?}", exec_time);
-    
+
     // Expected: ~65ms (2 × [10 + 2×10] + 5)
-    assert!(exec_time < std::time::Duration::from_millis(150),
-            "Nested loops performance issue. Execution time: {:?}", exec_time);
-    
+    assert!(
+        exec_time < std::time::Duration::from_millis(150),
+        "Nested loops performance issue. Execution time: {:?}",
+        exec_time
+    );
+
     println!("✅ Test passed - Nested loops work correctly\n");
 }
 
@@ -198,18 +210,21 @@ sleep 5
 "#;
 
     println!("\n=== Test: Continue in Nested Loops ===");
-    
+
     let compile_time = measure_compile(&engine, script);
     println!("Compilation time: {:?}", compile_time);
-    
+
     let exec_time = measure_execution(&engine, script);
     println!("Execution time: {:?}", exec_time);
-    
+
     // Expected: ~95ms (2 × [10 + 2×10 + 10] + 5)
     // If continue fails: ~495ms (2 × [10 + 2×110 + 10] + 5)
-    assert!(exec_time < std::time::Duration::from_millis(200),
-            "Continue in nested loops may not work. Execution time: {:?}", exec_time);
-    
+    assert!(
+        exec_time < std::time::Duration::from_millis(200),
+        "Continue in nested loops may not work. Execution time: {:?}",
+        exec_time
+    );
+
     println!("✅ Test passed - Continue in nested loops works correctly\n");
 }
 
@@ -229,17 +244,20 @@ sleep 5
 "#;
 
     println!("\n=== Test: Break in Nested Loops ===");
-    
+
     let compile_time = measure_compile(&engine, script);
     println!("Compilation time: {:?}", compile_time);
-    
+
     let exec_time = measure_execution(&engine, script);
     println!("Execution time: {:?}", exec_time);
-    
+
     // Expected: ~65ms (3 × [10 + 10] + 5)
-    assert!(exec_time < std::time::Duration::from_millis(150),
-            "Break in nested loops performance issue. Execution time: {:?}", exec_time);
-    
+    assert!(
+        exec_time < std::time::Duration::from_millis(150),
+        "Break in nested loops performance issue. Execution time: {:?}",
+        exec_time
+    );
+
     println!("✅ Test passed - Break in nested loops works correctly\n");
 }
 
@@ -262,17 +280,20 @@ sleep 5
 "#;
 
     println!("\n=== Test: Complex Script ===");
-    
+
     let compile_time = measure_compile(&engine, script);
     println!("Compilation time: {:?}", compile_time);
-    
+
     let exec_time = measure_execution(&engine, script);
     println!("Execution time: {:?}", exec_time);
-    
+
     // Should complete quickly due to break
-    assert!(exec_time < std::time::Duration::from_millis(100),
-            "Complex script performance issue. Execution time: {:?}", exec_time);
-    
+    assert!(
+        exec_time < std::time::Duration::from_millis(100),
+        "Complex script performance issue. Execution time: {:?}",
+        exec_time
+    );
+
     println!("✅ Test passed - Complex script works correctly\n");
 }
 
@@ -286,11 +307,11 @@ end
 "#;
 
     println!("\n=== Test: Repeated Execution Performance ===");
-    
+
     // Compile once
     let compiled = engine.compile(script).unwrap();
     let compile_time = std::time::Duration::from_millis(0); // Already compiled
-    
+
     // Execute multiple times
     let iterations = 10;
     let start = std::time::Instant::now();
@@ -299,15 +320,21 @@ end
     }
     let total_exec_time = start.elapsed();
     let avg_exec_time = total_exec_time / iterations;
-    
+
     println!("Compilation time: {:?}", compile_time);
-    println!("Total execution time ({} iterations): {:?}", iterations, total_exec_time);
+    println!(
+        "Total execution time ({} iterations): {:?}",
+        iterations, total_exec_time
+    );
     println!("Average execution time per run: {:?}", avg_exec_time);
-    
+
     // Each execution should be fast (~10ms for 2×5ms sleeps)
-    assert!(avg_exec_time < std::time::Duration::from_millis(50),
-            "Repeated execution too slow. Avg time: {:?}", avg_exec_time);
-    
+    assert!(
+        avg_exec_time < std::time::Duration::from_millis(50),
+        "Repeated execution too slow. Avg time: {:?}",
+        avg_exec_time
+    );
+
     println!("✅ Test passed - Repeated execution is efficient\n");
 }
 
@@ -325,21 +352,27 @@ release
 "#;
 
     println!("\n=== Test: Mouse Instructions Parse Performance ===");
-    
+
     let compile_time = measure_compile(&engine, script);
     println!("Compilation time: {:?}", compile_time);
-    
+
     let exec_time = measure_execution(&engine, script);
     println!("Execution time: {:?}", exec_time);
-    
+
     // Compilation should be fast (all computation done at compile time)
-    assert!(compile_time < std::time::Duration::from_millis(10),
-            "Compilation too slow: {:?}", compile_time);
-    
+    assert!(
+        compile_time < std::time::Duration::from_millis(10),
+        "Compilation too slow: {:?}",
+        compile_time
+    );
+
     // Execution should be very fast (no computation, just inline API calls)
-    assert!(exec_time < std::time::Duration::from_millis(50),
-            "Execution too slow: {:?}", exec_time);
-    
+    assert!(
+        exec_time < std::time::Duration::from_millis(50),
+        "Execution too slow: {:?}",
+        exec_time
+    );
+
     println!("✅ Test passed - Mouse instructions use pre-compilation\n");
 }
 
@@ -354,18 +387,21 @@ end
 "#;
 
     println!("\n=== Test: Mouse Operations in Loop ===");
-    
+
     let compile_time = measure_compile(&engine, script);
     println!("Compilation time: {:?}", compile_time);
-    
+
     let exec_time = measure_execution(&engine, script);
     println!("Execution time: {:?}", exec_time);
-    
+
     // With inline optimization, the instruction dispatch overhead is minimal
     // Actual execution time depends on whether mouse feature is enabled and OS calls
     // The key point is that compilation pre-computes everything
-    assert!(compile_time < std::time::Duration::from_millis(10),
-            "Compilation too slow: {:?}", compile_time);
-    
+    assert!(
+        compile_time < std::time::Duration::from_millis(10),
+        "Compilation too slow: {:?}",
+        compile_time
+    );
+
     println!("✅ Test passed - Pre-compilation working correctly\n");
 }

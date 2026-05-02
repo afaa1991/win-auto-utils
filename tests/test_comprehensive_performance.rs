@@ -24,9 +24,9 @@
 //! cargo test test_full_builtin_mix_performance --test test_comprehensive_performance --features "script_engine,scripts_builtin" -- --nocapture
 //! ```
 
+use win_auto_utils::script_engine::instruction::InstructionRegistry;
 use win_auto_utils::script_engine::{ScriptConfig, ScriptEngine};
 use win_auto_utils::scripts_builtin::register_all;
-use win_auto_utils::script_engine::instruction::InstructionRegistry;
 
 /// Helper function to create an engine with all builtin instructions
 fn create_engine() -> ScriptEngine {
@@ -67,17 +67,20 @@ end
 "#;
 
     println!("\n=== Test: Keyboard Operations Performance ===");
-    
+
     let compile_time = measure_compile(&engine, script);
     println!("Compilation time: {:?}", compile_time);
-    
+
     let exec_time = measure_execution(&engine, script);
     println!("Execution time: {:?}", exec_time);
-    
+
     // Compilation should be fast (pre-builds INPUT structures)
-    assert!(compile_time < std::time::Duration::from_millis(10),
-            "Keyboard compilation too slow: {:?}", compile_time);
-    
+    assert!(
+        compile_time < std::time::Duration::from_millis(10),
+        "Keyboard compilation too slow: {:?}",
+        compile_time
+    );
+
     println!("✅ Test passed - Keyboard instructions compiled efficiently\n");
 }
 
@@ -93,19 +96,25 @@ sleep 5
 "#;
 
     println!("\n=== Test: Timing Instructions Performance ===");
-    
+
     let compile_time = measure_compile(&engine, script);
     println!("Compilation time: {:?}", compile_time);
-    
+
     let exec_time = measure_execution(&engine, script);
     println!("Execution time: {:?}", exec_time);
-    
+
     // Expected: ~115ms (10 + 5×20 + 5)
-    assert!(exec_time > std::time::Duration::from_millis(100),
-            "Execution too fast, timing may be wrong: {:?}", exec_time);
-    assert!(exec_time < std::time::Duration::from_millis(200),
-            "Execution too slow: {:?}", exec_time);
-    
+    assert!(
+        exec_time > std::time::Duration::from_millis(100),
+        "Execution too fast, timing may be wrong: {:?}",
+        exec_time
+    );
+    assert!(
+        exec_time < std::time::Duration::from_millis(200),
+        "Execution too slow: {:?}",
+        exec_time
+    );
+
     println!("✅ Test passed - Timing instructions work correctly\n");
 }
 
@@ -131,18 +140,21 @@ end
 "#;
 
     println!("\n=== Test: All Control Flow Mixed ===");
-    
+
     let compile_time = measure_compile(&engine, script);
     println!("Compilation time: {:?}", compile_time);
-    
+
     let exec_time = measure_execution(&engine, script);
     println!("Execution time: {:?}", exec_time);
-    
+
     // Expected: ~55ms (first loop: 5+2×5+5+10, second loop: 2×5)
     // If continue/break fail: much longer
-    assert!(exec_time < std::time::Duration::from_millis(150),
-            "Control flow mix performance issue: {:?}", exec_time);
-    
+    assert!(
+        exec_time < std::time::Duration::from_millis(150),
+        "Control flow mix performance issue: {:?}",
+        exec_time
+    );
+
     println!("✅ Test passed - Mixed control flow works correctly\n");
 }
 
@@ -184,21 +196,27 @@ sleep 5
 "#;
 
     println!("\n=== Test: Full Builtin Instructions Mix ===");
-    
+
     let compile_time = measure_compile(&engine, script);
     println!("Compilation time: {:?}", compile_time);
-    
+
     let exec_time = measure_execution(&engine, script);
     println!("Execution time: {:?}", exec_time);
-    
+
     // Verify compilation is efficient despite complex script
-    assert!(compile_time < std::time::Duration::from_millis(20),
-            "Full mix compilation too slow: {:?}", compile_time);
-    
+    assert!(
+        compile_time < std::time::Duration::from_millis(20),
+        "Full mix compilation too slow: {:?}",
+        compile_time
+    );
+
     // Execution should complete in reasonable time
-    assert!(exec_time < std::time::Duration::from_millis(300),
-            "Full mix execution too slow: {:?}", exec_time);
-    
+    assert!(
+        exec_time < std::time::Duration::from_millis(300),
+        "Full mix execution too slow: {:?}",
+        exec_time
+    );
+
     println!("✅ Test passed - All builtin instructions work together\n");
 }
 
@@ -219,17 +237,20 @@ sleep 5
 "#;
 
     println!("\n=== Test: Deeply Nested Loops (3 Levels) ===");
-    
+
     let compile_time = measure_compile(&engine, script);
     println!("Compilation time: {:?}", compile_time);
-    
+
     let exec_time = measure_execution(&engine, script);
     println!("Execution time: {:?}", exec_time);
-    
+
     // Expected: ~85ms (2 × [5 + 2×(5 + 2×5)] + 5)
-    assert!(exec_time < std::time::Duration::from_millis(200),
-            "Deep nesting performance issue: {:?}", exec_time);
-    
+    assert!(
+        exec_time < std::time::Duration::from_millis(200),
+        "Deep nesting performance issue: {:?}",
+        exec_time
+    );
+
     println!("✅ Test passed - Deep nesting works correctly\n");
 }
 
@@ -253,21 +274,27 @@ sleep 5
 "#;
 
     println!("\n=== Test: Time Blocks with Break/Continue ===");
-    
+
     let compile_time = measure_compile(&engine, script);
     println!("Compilation time: {:?}", compile_time);
-    
+
     let exec_time = measure_execution(&engine, script);
     println!("Execution time: {:?}", exec_time);
-    
+
     // First time block: ~100ms (5 iterations × 20ms, continue skips second sleep)
     // Second time block: ~20ms (break after first iteration)
     // Total: ~125ms
-    assert!(exec_time > std::time::Duration::from_millis(100),
-            "Execution too fast, time blocks may not work: {:?}", exec_time);
-    assert!(exec_time < std::time::Duration::from_millis(250),
-            "Execution too slow: {:?}", exec_time);
-    
+    assert!(
+        exec_time > std::time::Duration::from_millis(100),
+        "Execution too fast, time blocks may not work: {:?}",
+        exec_time
+    );
+    assert!(
+        exec_time < std::time::Duration::from_millis(250),
+        "Execution too slow: {:?}",
+        exec_time
+    );
+
     println!("✅ Test passed - Time blocks with control flow work correctly\n");
 }
 
@@ -283,13 +310,13 @@ end
 "#;
 
     println!("\n=== Test: Compiled Script Reuse Performance ===");
-    
+
     // Compile once
     let compile_start = std::time::Instant::now();
     let compiled = engine.compile(script).unwrap();
     let compile_time = compile_start.elapsed();
     println!("Single compilation time: {:?}", compile_time);
-    
+
     // Execute multiple times using same compiled script
     let iterations = 20;
     let exec_start = std::time::Instant::now();
@@ -298,15 +325,25 @@ end
     }
     let total_exec_time = exec_start.elapsed();
     let avg_exec_time = total_exec_time / iterations;
-    
-    println!("Total execution time ({} iterations): {:?}", iterations, total_exec_time);
+
+    println!(
+        "Total execution time ({} iterations): {:?}",
+        iterations, total_exec_time
+    );
     println!("Average execution time per run: {:?}", avg_exec_time);
-    println!("Compilation amortized over {} runs: {:?}", iterations, compile_time / iterations);
-    
+    println!(
+        "Compilation amortized over {} runs: {:?}",
+        iterations,
+        compile_time / iterations
+    );
+
     // Verify reuse is efficient
-    assert!(avg_exec_time < std::time::Duration::from_millis(50),
-            "Repeated execution too slow: {:?}", avg_exec_time);
-    
+    assert!(
+        avg_exec_time < std::time::Duration::from_millis(50),
+        "Repeated execution too slow: {:?}",
+        avg_exec_time
+    );
+
     println!("✅ Test passed - Compiled script reuse is efficient\n");
 }
 
@@ -327,17 +364,20 @@ end
 "#;
 
     println!("\n=== Test: Mode Switching Performance ===");
-    
+
     let compile_time = measure_compile(&engine, script);
     println!("Compilation time: {:?}", compile_time);
-    
+
     let exec_time = measure_execution(&engine, script);
     println!("Execution time: {:?}", exec_time);
-    
+
     // Compilation should handle mode switching efficiently
-    assert!(compile_time < std::time::Duration::from_millis(15),
-            "Mode switching compilation too slow: {:?}", compile_time);
-    
+    assert!(
+        compile_time < std::time::Duration::from_millis(15),
+        "Mode switching compilation too slow: {:?}",
+        compile_time
+    );
+
     println!("✅ Test passed - Mode switching handled efficiently\n");
 }
 
@@ -351,19 +391,25 @@ end
 "#;
 
     println!("\n=== Test: Extreme Loop Count (100 iterations) ===");
-    
+
     let compile_time = measure_compile(&engine, script);
     println!("Compilation time: {:?}", compile_time);
-    
+
     let exec_time = measure_execution(&engine, script);
     println!("Execution time: {:?}", exec_time);
-    
+
     // Expected: ~100ms (100 × 1ms)
-    assert!(exec_time > std::time::Duration::from_millis(80),
-            "Execution too fast, loop may not run fully: {:?}", exec_time);
-    assert!(exec_time < std::time::Duration::from_millis(200),
-            "Execution too slow: {:?}", exec_time);
-    
+    assert!(
+        exec_time > std::time::Duration::from_millis(80),
+        "Execution too fast, loop may not run fully: {:?}",
+        exec_time
+    );
+    assert!(
+        exec_time < std::time::Duration::from_millis(200),
+        "Execution too slow: {:?}",
+        exec_time
+    );
+
     println!("✅ Test passed - High iteration count works correctly\n");
 }
 
@@ -371,7 +417,7 @@ end
 fn test_instruction_parsing_overhead() {
     // Test Case 10: Measure pure parsing overhead without execution
     let engine = create_engine();
-    
+
     // Scripts with varying complexity
     let simple_script = "key A";
     let medium_script = r#"loop 5
@@ -391,23 +437,32 @@ time 50
 end"#;
 
     println!("\n=== Test: Instruction Parsing Overhead ===");
-    
+
     let simple_time = measure_compile(&engine, simple_script);
     println!("Simple script (1 instr): {:?}", simple_time);
-    
+
     let medium_time = measure_compile(&engine, medium_script);
     println!("Medium script (3 instr types): {:?}", medium_time);
-    
+
     let complex_time = measure_compile(&engine, complex_script);
     println!("Complex script (nested): {:?}", complex_time);
-    
+
     // Verify parsing scales reasonably
-    assert!(simple_time < std::time::Duration::from_millis(5),
-            "Simple parse too slow: {:?}", simple_time);
-    assert!(medium_time < std::time::Duration::from_millis(10),
-            "Medium parse too slow: {:?}", medium_time);
-    assert!(complex_time < std::time::Duration::from_millis(20),
-            "Complex parse too slow: {:?}", complex_time);
-    
+    assert!(
+        simple_time < std::time::Duration::from_millis(5),
+        "Simple parse too slow: {:?}",
+        simple_time
+    );
+    assert!(
+        medium_time < std::time::Duration::from_millis(10),
+        "Medium parse too slow: {:?}",
+        medium_time
+    );
+    assert!(
+        complex_time < std::time::Duration::from_millis(20),
+        "Complex parse too slow: {:?}",
+        complex_time
+    );
+
     println!("✅ Test passed - Parsing overhead is acceptable\n");
 }

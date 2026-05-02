@@ -2,10 +2,12 @@
 //!
 //! Handles parallel region processing with Rayon.
 
-use windows::Win32::Foundation::HANDLE;
-use crate::memory_aobscan::scanner::strategy::{AnchorInfo, scan_with_single_byte_anchor, scan_with_multi_byte_anchor};
 use crate::memory_aobscan::pattern::Pattern;
+use crate::memory_aobscan::scanner::strategy::{
+    scan_with_multi_byte_anchor, scan_with_single_byte_anchor, AnchorInfo,
+};
 use std::sync::atomic::{AtomicBool, Ordering};
+use windows::Win32::Foundation::HANDLE;
 
 /// Wrapper to make HANDLE Send + Sync for Rayon
 #[derive(Clone, Copy)]
@@ -17,7 +19,7 @@ impl SafeHandle {
     pub fn new(handle: HANDLE) -> Self {
         SafeHandle(handle.0 as usize)
     }
-    
+
     pub fn get(&self) -> HANDLE {
         HANDLE(self.0 as *mut _)
     }
@@ -48,10 +50,18 @@ pub fn process_region(
     if region_end <= start_address {
         return;
     }
-    
-    let effective_start = if *region_addr >= start_address { *region_addr } else { start_address };
-    let effective_end = if length > 0 { std::cmp::min(region_end, start_address + length) } else { region_end };
-    
+
+    let effective_start = if *region_addr >= start_address {
+        *region_addr
+    } else {
+        start_address
+    };
+    let effective_end = if length > 0 {
+        std::cmp::min(region_end, start_address + length)
+    } else {
+        region_end
+    };
+
     if effective_start >= effective_end {
         return;
     }
@@ -65,9 +75,10 @@ pub fn process_region(
             break;
         }
 
-        let bytes_to_read = std::cmp::min(chunk_size, (effective_end - region_addr) - current_offset);
+        let bytes_to_read =
+            std::cmp::min(chunk_size, (effective_end - region_addr) - current_offset);
         let actual_addr = region_addr + current_offset;
-        
+
         match crate::memory::read_memory_bytes(h, actual_addr, bytes_to_read) {
             Ok(buffer) => {
                 if use_multi_byte {
@@ -93,10 +104,10 @@ pub fn process_region(
                         find_all,
                     );
                 }
-            },
+            }
             Err(_) => {}
         }
-        
+
         current_offset += chunk_size;
     }
 }

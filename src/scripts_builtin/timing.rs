@@ -38,12 +38,12 @@
 //! sleep abc              → "Invalid duration 'abc': ..."
 //! ```
 
-use crate::scripts_builtin::terminator::TerminatorHandler;
 use crate::script_engine::compiler::GenericBlockMetadata;
 use crate::script_engine::instruction::{
     BlockStructure, InstructionData, InstructionHandler, InstructionMetadata, ScriptError,
 };
 use crate::script_engine::VMContext;
+use crate::scripts_builtin::terminator::TerminatorHandler;
 use crate::utils::sleep_ms;
 use std::time::Instant;
 
@@ -66,30 +66,34 @@ pub const TIME_STACK_KEY: &str = "__builtin_time_stack";
 /// Initialize time terminator registration (call once at startup)
 pub fn init_time_terminator() {
     use crate::script_engine::compiler::TerminatorMetadata;
-    
-    TerminatorHandler::register_handler("time", |vm: &mut VMContext, _metadata: &TerminatorMetadata| {
-        // Get time stack from VM execution state
-        let time_stack = vm.get_or_create_execution_state::<Vec<TimeRuntimeState>>(TIME_STACK_KEY);
 
-        // Check the current time state (peek without popping)
-        if let Some(time_state) = time_stack.last() {
-            // Check if time has elapsed
-            let elapsed_ms = time_state.start_time.elapsed().as_millis() as u32;
+    TerminatorHandler::register_handler(
+        "time",
+        |vm: &mut VMContext, _metadata: &TerminatorMetadata| {
+            // Get time stack from VM execution state
+            let time_stack =
+                vm.get_or_create_execution_state::<Vec<TimeRuntimeState>>(TIME_STACK_KEY);
 
-            if elapsed_ms < time_state.total_duration_ms {
-                // Time not yet elapsed, jump back to body start
-                Ok(time_state.body_start_ip)
+            // Check the current time state (peek without popping)
+            if let Some(time_state) = time_stack.last() {
+                // Check if time has elapsed
+                let elapsed_ms = time_state.start_time.elapsed().as_millis() as u32;
+
+                if elapsed_ms < time_state.total_duration_ms {
+                    // Time not yet elapsed, jump back to body start
+                    Ok(time_state.body_start_ip)
+                } else {
+                    // Time elapsed, pop and continue after 'end'
+                    time_stack.pop();
+                    Ok(vm.ip + 1)
+                }
             } else {
-                // Time elapsed, pop and continue after 'end'
-                time_stack.pop();
-                Ok(vm.ip + 1)
+                Err(ScriptError::ExecutionError(
+                    "Time end without active time block".into(),
+                ))
             }
-        } else {
-            Err(ScriptError::ExecutionError(
-                "Time end without active time block".into(),
-            ))
-        }
-    });
+        },
+    );
 }
 
 /// Sleep handler

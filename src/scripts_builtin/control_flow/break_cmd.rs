@@ -7,7 +7,9 @@ use super::loop_cmd::{LoopRuntimeState, LOOP_STACK_KEY};
 #[cfg(feature = "scripts_timing")]
 use crate::scripts_builtin::timing::{TimeRuntimeState, TIME_STACK_KEY};
 
-use crate::script_engine::instruction::{InstructionData, InstructionHandler, InstructionMetadata, ScriptError};
+use crate::script_engine::instruction::{
+    InstructionData, InstructionHandler, InstructionMetadata, ScriptError,
+};
 use crate::script_engine::VMContext;
 
 /// Break handler - exit current loop or time block
@@ -47,22 +49,23 @@ impl InstructionHandler for BreakHandler {
         // First, try to break out of a time block (higher priority)
         #[cfg(feature = "scripts_timing")]
         {
-            let time_stack = vm.get_or_create_execution_state::<Vec<TimeRuntimeState>>(TIME_STACK_KEY);
-            
+            let time_stack =
+                vm.get_or_create_execution_state::<Vec<TimeRuntimeState>>(TIME_STACK_KEY);
+
             if !time_stack.is_empty() {
                 let time_state = time_stack.pop().unwrap();
-                
+
                 // Cleanup block context
                 if !vm.is_block_context_empty() {
                     vm.leave_block();
                 }
-                
+
                 // Jump to instruction after 'end'
                 vm.ip = time_state.end_ip + 1;
                 return Ok(());
             }
         }
-        
+
         // Not in a time block, try loop stack
         let loop_stack = vm.get_or_create_execution_state::<Vec<LoopRuntimeState>>(LOOP_STACK_KEY);
 

@@ -16,7 +16,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("-------------------------------------------");
     println!("Usage: Process::by_name(\"notepad.exe\") + init()");
     println!();
-    
+
     let mut quick_process = Process::by_name("notepad.exe");
 
     match quick_process.init() {

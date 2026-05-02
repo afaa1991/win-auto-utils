@@ -23,36 +23,42 @@ fn main() {
     let width = 100i32;
     let height = 100i32;
     let mut buffer = vec![0u8; (width * height * 4) as usize];
-    
+
     // Fill with red background
     for i in 0..(width * height) {
         let offset = (i * 4) as usize;
-        buffer[offset] = 0;       // B
-        buffer[offset + 1] = 0;   // G
+        buffer[offset] = 0; // B
+        buffer[offset + 1] = 0; // G
         buffer[offset + 2] = 255; // R
         buffer[offset + 3] = 255; // A
     }
-    
+
     // Place a blue pixel at position (30, 40)
     let idx = ((40 * width + 30) * 4) as usize;
-    buffer[idx] = 255;     // B
-    buffer[idx + 1] = 0;   // G
-    buffer[idx + 2] = 0;   // R
-    
-    println!("Created {}x{} pixel buffer with red background", width, height);
+    buffer[idx] = 255; // B
+    buffer[idx + 1] = 0; // G
+    buffer[idx + 2] = 0; // R
+
+    println!(
+        "Created {}x{} pixel buffer with red background",
+        width, height
+    );
     println!("Placed blue pixel at (30, 40)");
-    
+
     // Method 1: Direct access through algorithms module
     let result = algorithms::find_color_in_buffer(&buffer, width, height, (255, 0, 0));
-    
+
     if result.matched {
-        println!("\n✓ Blue pixel found at local coordinates ({}, {})", result.x, result.y);
+        println!(
+            "\n✓ Blue pixel found at local coordinates ({}, {})",
+            result.x, result.y
+        );
         assert_eq!(result.x, 30);
         assert_eq!(result.y, 40);
     } else {
         println!("\n✗ Blue pixel not found!");
     }
-    
+
     println!();
 
     // ========================================================================
@@ -62,10 +68,10 @@ fn main() {
     {
         println!("2. Screen Region Color Finding (DXGI Integration)");
         println!("---------------------------------------------------");
-        
+
         println!("Method: color_finder::find_color");
         println!("  (Searches for color in a screen region using DXGI capture)");
-        
+
         // Example usage (commented out to avoid actual screen capture during demo)
         /*
         match color_finder::find_color(100, 100, 50, 50, (255, 0, 0)) {
@@ -79,10 +85,10 @@ fn main() {
             Err(e) => eprintln!("  Error: {}", e),
         }
         */
-        
+
         println!("\n  Note: Uncomment the code above to test actual screen capture.");
         println!("  The dxgi feature is automatically enabled by color_finder.");
-        
+
         println!("\n✓ Screen region color finding is available!");
     }
 
@@ -99,7 +105,7 @@ fn main() {
     // ========================================================================
     println!("\n3. Performance Characteristics");
     println!("-------------------------------");
-    
+
     println!("The color_finder module provides:");
     println!("  ✓ Pure Rust implementation (zero external dependencies)");
     println!("  ✓ Automatic AVX2 detection and optimization (~4-8x faster)");
@@ -110,7 +116,7 @@ fn main() {
     println!("  ✓ Ultra-fast screen region capture");
     println!("  ✓ Direct memory mapping (no full-screen copy)");
     println!("  ✓ Optimized for small region captures");
-    
+
     // ========================================================================
     // Summary
     // ========================================================================

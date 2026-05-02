@@ -36,7 +36,7 @@
 pub fn char_array_to_string(char_array: &[i8]) -> String {
     let bytes: Vec<u8> = char_array
         .iter()
-        .take_while(|&&c| c != 0) 
+        .take_while(|&&c| c != 0)
         .map(|&c| c as u8)
         .collect();
     String::from_utf8_lossy(&bytes).to_string()

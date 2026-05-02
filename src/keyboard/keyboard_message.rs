@@ -151,19 +151,31 @@ impl PostMessageKeyboard {
     }
 
     /// Press a key using pre-compiled codes (high performance)
-    pub fn press_with_codes(&self, vk_code: u8, scan_code: u16) -> Result<(), PostMessageKeyBoardError> {
+    pub fn press_with_codes(
+        &self,
+        vk_code: u8,
+        scan_code: u16,
+    ) -> Result<(), PostMessageKeyBoardError> {
         post_key_down_atomic(self.hwnd, vk_code, scan_code);
         Ok(())
     }
 
     /// Release a key using pre-compiled codes
-    pub fn release_with_codes(&self, vk_code: u8, scan_code: u16) -> Result<(), PostMessageKeyBoardError> {
+    pub fn release_with_codes(
+        &self,
+        vk_code: u8,
+        scan_code: u16,
+    ) -> Result<(), PostMessageKeyBoardError> {
         post_key_up_atomic(self.hwnd, vk_code, scan_code);
         Ok(())
     }
 
     /// Click a key using pre-compiled codes
-    pub fn click_with_codes(&self, vk_code: u8, scan_code: u16) -> Result<(), PostMessageKeyBoardError> {
+    pub fn click_with_codes(
+        &self,
+        vk_code: u8,
+        scan_code: u16,
+    ) -> Result<(), PostMessageKeyBoardError> {
         post_key_click_atomic(self.hwnd, vk_code, scan_code);
         Ok(())
     }

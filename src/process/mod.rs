@@ -60,16 +60,19 @@
 //! use win_auto_utils::process::ProcessManager;
 //!
 //! let mut manager = ProcessManager::new();
-//! manager.register_alias("game", "lf2.exe").ok();
+//! manager.register_alias("game", "app.exe").ok();
 //! manager.init("game").ok();
 //! ```
 
 pub mod config;
-pub mod state;
 pub mod manager;
 mod process;
+pub mod state;
 
 // Re-export main types for convenience
-pub use config::{ProcessConfig, ProcessConfigBuilder, DCMode, WindowFilter, FilterRuleType, FilterCriterion, InitFlags};
+pub use config::{
+    DCMode, FilterCriterion, FilterRuleType, InitFlags, ProcessConfig, ProcessConfigBuilder,
+    WindowFilter,
+};
 pub use manager::ProcessManager;
 pub use process::{Process, ProcessError, ProcessResult};

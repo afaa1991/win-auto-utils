@@ -75,15 +75,15 @@
 //! 2. **Anchor Search**: Uses `memchr` to quickly locate potential match positions
 //! 3. **Pattern Verification**: Validates full pattern at each candidate position (SIMD accelerated)
 
-mod pattern;
-mod cache;
-mod verifier;
-mod scanner;
 mod builder;
+mod cache;
+mod pattern;
+mod scanner;
+mod verifier;
 
-pub use pattern::Pattern;
 pub use builder::AobScanBuilder;
-pub use cache::{clear_region_cache, clear_all_region_cache};
+pub use cache::{clear_all_region_cache, clear_region_cache};
+pub use pattern::Pattern;
 
 #[cfg(test)]
 mod tests {
@@ -136,7 +136,7 @@ mod tests {
     fn test_multi_byte_anchor_sequence() {
         // Pattern with consecutive known bytes
         let pattern = Pattern::from_str("48 89 5C ?? 90 91").unwrap();
-        
+
         // Verify parsing succeeds; internal anchor logic is tested via integration/scanning
         drop(pattern);
     }
@@ -145,7 +145,7 @@ mod tests {
     fn test_no_multi_byte_anchor_for_wildcards() {
         // Pattern with only wildcards or single known bytes separated by wildcards
         let pattern = Pattern::from_str("48 ?? 55 ?? 90").unwrap();
-        
+
         // Verify parsing succeeds
         drop(pattern);
     }
@@ -162,11 +162,12 @@ mod tests {
         let handle = HANDLE(std::ptr::null_mut());
         // Just verify that builder methods can be chained without error
         let _builder = AobScanBuilder::new(handle)
-            .pattern_str("48 ?? 55").unwrap()
+            .pattern_str("48 ?? 55")
+            .unwrap()
             .start_address(0x1000)
             .length(0x100)
             .find_all(true);
-        
+
         // Builder successfully created with all settings applied
         // (Fields are private, so we just verify the chain compiles)
     }
@@ -174,10 +175,10 @@ mod tests {
     #[test]
     fn test_simd_scalar_consistency() {
         use crate::memory_aobscan::verifier::verify_pattern;
-        
+
         // Test that SIMD and scalar implementations produce the same results
         let pattern = Pattern::from_str("48 89 5C ?? 90 91 92 93 94 95 96 97 98 99 9A 9B").unwrap();
-        
+
         // Create a buffer that matches the pattern
         let mut buffer = vec![0u8; 64];
         buffer[0] = 0x48;
@@ -187,7 +188,7 @@ mod tests {
         for i in 4..16 {
             buffer[i] = 0x90 + (i - 4) as u8;
         }
-        
+
         let result = verify_pattern(&buffer, 0, &pattern);
         assert!(result, "Pattern should match at offset 0");
     }
@@ -195,16 +196,16 @@ mod tests {
     #[test]
     fn test_simd_mismatch_detection() {
         use crate::memory_aobscan::verifier::verify_pattern;
-        
+
         let pattern = Pattern::from_str("48 89 5C ?? 90 91 92 93 94 95 96 97 98 99 9A 9B").unwrap();
-        
+
         // Create a buffer that does NOT match
         let mut buffer = vec![0u8; 64];
         buffer[0] = 0x48;
         buffer[1] = 0x89;
         buffer[2] = 0x5C;
         buffer[4] = 0xFF; // This should cause mismatch
-        
+
         let result = verify_pattern(&buffer, 0, &pattern);
         assert!(!result, "Pattern should not match due to byte mismatch");
     }
@@ -212,15 +213,15 @@ mod tests {
     #[test]
     fn test_prefetch_does_not_affect_correctness() {
         use crate::memory_aobscan::verifier::verify_pattern;
-        
+
         // Ensure prefetching doesn't change verification results
         let pattern = Pattern::from_str("48 89 5C").unwrap();
         let buffer = vec![0x48, 0x89, 0x5C, 0x00, 0x00];
-        
+
         // Test multiple offsets
         for offset in 0..3 {
             let result = verify_pattern(&buffer, offset, &pattern);
-            
+
             if offset == 0 {
                 assert!(result, "Should match at offset 0");
             } else {

@@ -42,8 +42,16 @@ mod tests {
         let elapsed = start.elapsed();
 
         // Should sleep at least 10ms (with some tolerance for OS scheduling)
-        assert!(elapsed.as_millis() >= 10, "Slept for {:?}, expected at least 10ms", elapsed);
-        assert!(elapsed.as_millis() < 50, "Slept for {:?}, expected less than 50ms", elapsed);
+        assert!(
+            elapsed.as_millis() >= 10,
+            "Slept for {:?}, expected at least 10ms",
+            elapsed
+        );
+        assert!(
+            elapsed.as_millis() < 50,
+            "Slept for {:?}, expected less than 50ms",
+            elapsed
+        );
     }
 
     #[test]
@@ -53,7 +61,11 @@ mod tests {
         let elapsed = start.elapsed();
 
         // Zero sleep should return almost immediately
-        assert!(elapsed.as_millis() < 10, "Zero sleep took too long: {:?}", elapsed);
+        assert!(
+            elapsed.as_millis() < 10,
+            "Zero sleep took too long: {:?}",
+            elapsed
+        );
     }
 
     #[test]
@@ -69,9 +81,9 @@ mod tests {
             let min_expected = ms as u128;
             // For small delays (< 10ms), Windows may sleep longer due to timer resolution
             let max_expected = if ms < 10 {
-                (ms as f64 * 5.0) as u128  // 5x tolerance for sub-10ms delays
+                (ms as f64 * 5.0) as u128 // 5x tolerance for sub-10ms delays
             } else {
-                (ms as f64 * 2.0) as u128  // 2x tolerance for larger delays
+                (ms as f64 * 2.0) as u128 // 2x tolerance for larger delays
             };
 
             assert!(

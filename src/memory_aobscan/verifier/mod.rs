@@ -41,7 +41,7 @@ mod verify {
                     return verify_pattern_avx512(buffer, offset, pattern);
                 }
             }
-            
+
             // Priority 2: Use AVX2 for patterns >= 16 bytes
             if pattern.bytes.len() >= 16 && std::is_x86_feature_detected!("avx2") {
                 unsafe {
@@ -49,7 +49,7 @@ mod verify {
                 }
             }
         }
-        
+
         // Priority 3: Fallback to optimized scalar implementation
         verify_pattern_scalar(buffer, offset, pattern)
     }

@@ -161,7 +161,7 @@ impl InstructionHandler for ClickHandler {
                             Some((x, y))
                         }
                     }
-                    
+
                     #[cfg(not(feature = "script_process_context"))]
                     {
                         // Without process_context feature, coordinates are treated as screen coordinates
@@ -206,10 +206,14 @@ impl InstructionHandler for ClickHandler {
                     use crate::mouse::mouse_message;
                     // Coordinates are guaranteed to exist in PostMessage mode (validated during parse)
                     let x = params.x.ok_or_else(|| {
-                        ScriptError::ExecutionError("PostMessage click requires x coordinate".into())
+                        ScriptError::ExecutionError(
+                            "PostMessage click requires x coordinate".into(),
+                        )
                     })?;
                     let y = params.y.ok_or_else(|| {
-                        ScriptError::ExecutionError("PostMessage click requires y coordinate".into())
+                        ScriptError::ExecutionError(
+                            "PostMessage click requires y coordinate".into(),
+                        )
                     })?;
                     // Convert window coordinates to client coordinates for PostMessage
                     let (client_x, client_y) = super::convert_to_client_coords(vm, x, y)?;
@@ -225,7 +229,8 @@ impl InstructionHandler for ClickHandler {
                     return Err(ScriptError::ExecutionError(
                         "PostMessage mode requires 'script_process_context' feature. \
                          Enable it in Cargo.toml: features = [\"scripts_mouse_with_post\"] \
-                         or use SendInput mode (default).".into()
+                         or use SendInput mode (default)."
+                            .into(),
                     ));
                 }
             }

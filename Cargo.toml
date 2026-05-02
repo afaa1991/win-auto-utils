@@ -1,6 +1,6 @@
 [package]
 name = "win-auto-utils"
-version = "0.2.2"
+version = "0.2.3"
 edition = "2021"
 description = "Universal Windows automation utilities with memory, window, input, and color operations"
 authors = ["CC"]
@@ -166,10 +166,17 @@ template_matcher = [
 ]
 
 # Memory address resolution (symbolic addresses like "game.exe+0x123->456")
-memory_resolver = ["memory", "snapshot"]
+# Includes both static address parsing and AOB pattern scanning
+memory_resolver = ["memory", "snapshot", "memory_aobscan"]
 
 # Memory AOB (Array of Bytes) scanning with SIMD acceleration
-memory_aobscan = ["memory", "snapshot", "dep:memchr", "dep:rayon"]
+memory_aobscan = [
+    "memory",
+    "snapshot",
+    "dep:memchr",
+    "dep:rayon",
+    "windows/Win32_System_Memory",  # For VirtualQueryEx, MEMORY_BASIC_INFORMATION
+]
 
 # Memory locking - Continuous monitoring and value restoration
 # Independent from memory_hook, provides freeze/lock functionality
@@ -191,7 +198,7 @@ memory_hook = [
 ]
 
 # Memory Manager - Unified interface for memory modifications (Locks, Hooks, etc.)
-memory_manager = ["memory_lock", "memory_hook", "memory_resolver"]
+memory_manager = ["memory_lock", "memory_hook", "memory_resolver", "utils_architecture"]
 
 # Register extractor - Automatic CPU register capture at hook points
 # Provides high-level API for extracting register values without complex pointer chains
@@ -204,9 +211,10 @@ memory_register_extractor = ["memory_hook"]
 utils_key_code = [] # Key code conversion utilities
 utils_chars = []    # Character/string conversion utilities
 utils_thread = []   # Thread utility functions (sleep, etc.)
+utils_architecture = ["dep:windows", "memory_hook", "windows/Win32_Foundation", "windows/Win32_System_Threading"] # Process architecture detection
 
 # Combined feature for backward compatibility (enables all utils)
-utils = ["utils_key_code", "utils_chars", "utils_thread"]
+utils = ["utils_key_code", "utils_chars", "utils_thread", "utils_architecture"]
 
 # Script engine - Pure Rust implementation (zero dependencies, cross-platform)
 # This is the core framework only, with no built-in instructions.
@@ -326,3 +334,58 @@ full = [
 name = "dll_injection"
 path = "examples/dll_injection.rs"
 required-features = ["dll_injector", "snapshot"]
+
+[[example]]
+name = "dxgi_capture"
+path = "examples/dxgi_capture.rs"
+required-features = ["dxgi"]
+
+[[example]]
+name = "dxgi_performance_comparison"
+path = "examples/dxgi_performance_comparison.rs"
+required-features = ["dxgi"]
+
+[[example]]
+name = "memory_manager_example"
+path = "examples/memory_manager_example.rs"
+required-features = ["memory_manager"]
+
+[[example]]
+name = "process_manager_example"
+path = "examples/process_manager_example.rs"
+required-features = ["process"]
+
+[[example]]
+name = "script_engine"
+path = "examples/script_engine.rs"
+required-features = ["script_engine", "scripts_builtin"]
+
+[[example]]
+name = "clipboard_usage"
+path = "examples/clipboard_usage.rs"
+required-features = ["clipboard"]
+
+[[example]]
+name = "color_conversion"
+path = "examples/color_conversion.rs"
+required-features = ["color_picker"]
+
+[[example]]
+name = "color_reexports"
+path = "examples/color_reexports.rs"
+required-features = ["color_finder"]
+
+[[example]]
+name = "active_instruction"
+path = "examples/active_instruction.rs"
+required-features = ["scripts_window", "script_process_context"]
+
+[[example]]
+name = "custom_init_flags"
+path = "examples/custom_init_flags.rs"
+required-features = ["process"]
+
+[[example]]
+name = "aobscan_64bit_bytecode"
+path = "examples/aobscan_64bit_bytecode.rs"
+required-features = ["memory_aobscan"]

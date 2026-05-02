@@ -75,16 +75,16 @@ use crate::script_engine::InstructionHandler;
 // Submodules - each instruction category in its own module
 #[cfg(feature = "scripts_control_flow")]
 mod control_flow;
-#[cfg(feature = "scripts_mode")]
-mod mode;
 #[cfg(feature = "scripts_keyboard")]
 mod keyboard;
+#[cfg(feature = "scripts_mode")]
+mod mode;
 #[cfg(feature = "scripts_mouse")]
-pub mod mouse;  // Changed to pub mod to expose the module
-#[cfg(feature = "scripts_timing")]
-mod timing;
+pub mod mouse; // Changed to pub mod to expose the module
 #[cfg(feature = "scripts_terminator")]
 mod terminator;
+#[cfg(feature = "scripts_timing")]
+mod timing;
 #[cfg(all(feature = "scripts_window", feature = "script_process_context"))]
 mod window;
 
@@ -390,12 +390,12 @@ impl BuiltinInstructions {
 /// ```
 pub fn register_all(registry: &mut crate::script_engine::instruction::InstructionRegistry) {
     // Register all handlers directly - using the clean API!
-    
+
     #[cfg(feature = "scripts_control_flow")]
     {
         // Initialize terminators BEFORE registering handlers
         control_flow::init_loop_terminator();
-        
+
         registry.register(control_flow::LoopHandler).ok();
         registry.register(terminator::TerminatorHandler).ok();
         registry.register(control_flow::ContinueHandler).ok();
@@ -429,7 +429,7 @@ pub fn register_all(registry: &mut crate::script_engine::instruction::Instructio
     {
         // Initialize time terminator
         timing::init_time_terminator();
-        
+
         registry.register(timing::SleepHandler).ok();
         registry.register(timing::TimeHandler).ok();
     }

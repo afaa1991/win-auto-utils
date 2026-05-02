@@ -1,10 +1,13 @@
 //! Lock Handler for memory locking
+//!
+//! Supports static address patterns with multi-level pointer resolution.
+//! Example: "game.exe+1000->2FC->30" (module base + offset -> pointer dereference + offset)
 
-use std::time::Duration;
-use windows::Win32::Foundation::HANDLE;
+use super::address_strategy::AddressStrategy;
 use crate::memory::MemoryError;
 use crate::memory_lock::MemoryLock;
-use crate::memory_resolver::{AddressSource, ParseError};
+use crate::memory_resolver::MemoryAddress;
+use std::time::Duration;
 
 use super::super::register::ModifierHandler;
 
@@ -20,172 +23,153 @@ pub struct LockConfig {
 
 // ==================== Lock Handler ====================
 
-/// Lock handler with embedded address source
+/// Lock handler that directly uses MemoryAddress for static addresses
 pub struct LockHandler {
     config: LockConfig,
-    address_source: AddressSource,
+    /// Parsed MemoryAddress - resolved at activation time using architecture from context
+    memory_address: Option<MemoryAddress>,
+    /// Address strategy used to build the MemoryAddress
+    address_strategy: AddressStrategy,
     instance: Option<MemoryLock>,
-    last_handle: Option<HANDLE>,
-    last_pid: Option<u32>,
 }
 
 impl LockHandler {
-    /// Internal constructor (accepts AddressSource)
-    fn new(config: LockConfig, address_source: AddressSource) -> Self {
+    /// Internal constructor
+    fn new(config: LockConfig, address_strategy: AddressStrategy) -> Self {
         Self {
             config,
-            address_source,
+            address_strategy,
+            memory_address: None,
             instance: None,
-            last_handle: None,
-            last_pid: None,
         }
     }
 
-    /// Generic factory method - the single source of truth
-    pub fn new_with_address(
+    /// Create a LockHandler with static address pattern.
+    ///
+    /// The architecture is automatically detected at activation time from the ProcessContext.
+    /// Supports multi-level pointer chains with offsets.
+    ///
+    /// # Address Pattern Syntax
+    /// - **Module base**: `module_name+offset` (e.g., "game.exe+1000")
+    /// - **Pointer dereference**: `->offset` (e.g., "->2FC")
+    /// - **Direct offset**: `+offset` (e.g., "+30")
+    /// - **Hex by default**: All numbers are hexadecimal unless prefixed with `#`
+    /// - **Decimal marker**: `#` prefix (e.g., "#100" = decimal 100)
+    ///
+    /// # Arguments
+    /// * `name` - Lock name (must be unique within ModifierManager)
+    /// * `pattern` - Static address pattern string
+    /// * `value` - Value to lock (any type that implements AsBytes)
+    /// * `scan_interval` - How often to check and restore the locked value
+    ///
+    /// # Examples
+    /// ```no_run
+    /// use win_auto_utils::memory_manager::builtin::LockHandler;
+    /// use std::time::Duration;
+    ///
+    /// // Simple module + offset
+    /// let lock1 = LockHandler::new_lock(
+    ///     "health_lock",
+    ///     "game.exe+1000",
+    ///     100i32,
+    ///     Duration::from_millis(100),
+    /// )?;
+    ///
+    /// // Multi-level pointer chain
+    /// let lock2 = LockHandler::new_lock(
+    ///     "ammo_lock",
+    ///     "game.exe+5000->2FC->30",
+    ///     999i32,
+    ///     Duration::from_millis(50),
+    /// )?;
+    /// # Ok::<_, Box<dyn std::error::Error>>(())
+    /// ```
+    pub fn new_lock<T: crate::memory_lock::AsBytes>(
         name: impl Into<String>,
-        address_source: AddressSource,
-        value: Vec<u8>,
+        pattern: &str,
+        value: T,
         scan_interval: Duration,
-    ) -> Box<dyn ModifierHandler> {
+    ) -> Result<Box<dyn ModifierHandler>, crate::memory_resolver::ParseError> {
         let config = LockConfig {
             name: name.into(),
-            value,
+            value: value.as_bytes().to_vec(),
             scan_interval,
         };
-        Box::new(Self::new(config, address_source))
-    }
-
-    /// Typed value variant
-    pub fn new_with_address_typed<T: crate::memory_lock::AsBytes>(
-        name: impl Into<String>,
-        address_source: AddressSource,
-        value: T,
-        scan_interval: Duration,
-    ) -> Box<dyn ModifierHandler> {
-        Self::new_with_address(name, address_source, value.as_bytes().to_vec(), scan_interval)
-    }
-
-    /// Create with x86 architecture pattern
-    pub fn new_lock_x86(
-        name: impl Into<String>,
-        pattern: &str,
-        value: Vec<u8>,
-        scan_interval: Duration,
-    ) -> Result<Box<dyn ModifierHandler>, ParseError> {
-        let addr = AddressSource::from_pattern_x86(pattern)?;
-        Ok(Self::new_with_address(name, addr, value, scan_interval))
-    }
-
-    pub fn new_lock_x86_typed<T: crate::memory_lock::AsBytes>(
-        name: impl Into<String>,
-        pattern: &str,
-        value: T,
-        scan_interval: Duration,
-    ) -> Result<Box<dyn ModifierHandler>, ParseError> {
-        let addr = AddressSource::from_pattern_x86(pattern)?;
-        Ok(Self::new_with_address_typed(name, addr, value, scan_interval))
-    }
-
-    /// Create with x64 architecture pattern
-    pub fn new_lock_x64(
-        name: impl Into<String>,
-        pattern: &str,
-        value: Vec<u8>,
-        scan_interval: Duration,
-    ) -> Result<Box<dyn ModifierHandler>, ParseError> {
-        let addr = AddressSource::from_pattern_x64(pattern)?;
-        Ok(Self::new_with_address(name, addr, value, scan_interval))
-    }
-
-    pub fn new_lock_x64_typed<T: crate::memory_lock::AsBytes>(
-        name: impl Into<String>,
-        pattern: &str,
-        value: T,
-        scan_interval: Duration,
-    ) -> Result<Box<dyn ModifierHandler>, ParseError> {
-        let addr = AddressSource::from_pattern_x64(pattern)?;
-        Ok(Self::new_with_address_typed(name, addr, value, scan_interval))
-    }
-
-    // ===== AOB Scan Methods =====
-
-    /// Create from AOB pattern
-    pub fn new_lock_aob(
-        name: impl Into<String>,
-        pattern: &str,
-        value: Vec<u8>,
-        scan_interval: Duration,
-    ) -> Result<Box<dyn ModifierHandler>, String> {
-        let addr = AddressSource::from_aob(pattern)?;
-        Ok(Self::new_with_address(name, addr, value, scan_interval))
-    }
-
-    pub fn new_lock_aob_typed<T: crate::memory_lock::AsBytes>(
-        name: impl Into<String>,
-        pattern: &str,
-        value: T,
-        scan_interval: Duration,
-    ) -> Result<Box<dyn ModifierHandler>, String> {
-        let addr = AddressSource::from_aob(pattern)?;
-        Ok(Self::new_with_address_typed(name, addr, value, scan_interval))
+        Ok(Box::new(Self::new(
+            config,
+            AddressStrategy::static_pattern(pattern),
+        )))
     }
 }
 
 impl ModifierHandler for LockHandler {
-    fn name(&self) -> &str { &self.config.name }
-    
-    fn activate(&mut self, handle: HANDLE, pid: u32) -> Result<(), MemoryError> {
-        // Check if context has changed (handle or pid)
-        let context_changed = self.last_handle != Some(handle) || self.last_pid != Some(pid);
-        
-        // If instance exists and context unchanged, return directly
-        if self.instance.is_some() && !context_changed {
-            return Ok(());
+    fn name(&self) -> &str {
+        &self.config.name
+    }
+
+    fn activate(
+        &mut self,
+        ctx: &crate::memory_manager::manager::ProcessContext,
+    ) -> Result<(), MemoryError> {
+        // Check if we can reuse existing instance by comparing handle/pid from the instance itself
+        let context_changed = if let Some(ref lock) = self.instance {
+            lock.get_handle() != Some(ctx.handle) || lock.get_pid() != Some(ctx.pid)
+        } else {
+            true // No instance, need to create
+        };
+
+        if !context_changed {
+            // Same process, just restart the monitoring thread
+            if let Some(ref mut lock) = self.instance {
+                return lock.lock_bytes(&self.config.value);
+            }
         }
 
-        // Deactivate old instance if context changed or creating new one
-        if self.instance.is_some() {
-            self.deactivate()?;
-        }
+        // Build new MemoryLock instance (context changed or no instance)
+        // Build memoryAddress from strategy using context architecture
+        let mem_addr = self
+            .address_strategy
+            .build_memory_address(ctx.architecture)?;
 
-        // Resolve address from the address source (supports both static and AOB)
-        let target_address = self.address_source.resolve(handle, pid)
-            .map_err(|e| MemoryError::InvalidAddress(format!("Failed to resolve address: {}", e)))?;
+        // Store the parsed MemoryAddress for potential future updates
+        self.memory_address = Some(mem_addr.clone());
+
+        // Resolve address using MemoryAddress
+        let target_address = mem_addr.resolve_address(ctx.handle, ctx.pid).map_err(|e| {
+            MemoryError::InvalidAddress(format!("Failed to resolve lock address: {}", e))
+        })?;
 
         // Create new instance with current context
         let mut lock = MemoryLock::builder()
-            .handle(handle)
-            .pid(pid)
+            .handle(ctx.handle)
+            .pid(ctx.pid)
             .address(target_address)
             .bytes(self.config.value.clone())
             .scan_interval(self.config.scan_interval)
             .build()?;
-        
+
         // Start monitoring
         lock.lock_bytes(&self.config.value)?;
-        
-        // Update state
+
+        // Cache the instance
         self.instance = Some(lock);
-        self.last_handle = Some(handle);
-        self.last_pid = Some(pid);
         Ok(())
     }
 
     fn deactivate(&mut self) -> Result<(), MemoryError> {
-        // MemoryLock automatically stops thread via Drop
-        if let Some(_lock) = self.instance.take() {
-            // Drop will automatically call stop_flag, no manual operation needed
+        // Stop the monitoring thread but keep the instance cached
+        // This allows quick re-activation without rebuilding
+        if let Some(ref mut lock) = self.instance {
+            lock.stop()?;
         }
-        // Clear context tracking
-        self.last_handle = None;
-        self.last_pid = None;
         Ok(())
     }
 
     fn is_active(&self) -> bool {
-        // MemoryLock has no is_running method, we determine by checking if instance exists
-        self.instance.is_some()
+        // Check if instance exists and is running
+        self.instance
+            .as_ref()
+            .map_or(false, |lock| lock.is_running())
     }
 }
 

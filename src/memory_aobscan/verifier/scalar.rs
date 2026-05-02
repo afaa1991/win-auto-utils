@@ -6,12 +6,12 @@ use crate::memory_aobscan::pattern::Pattern;
 #[inline]
 pub fn verify_pattern_scalar(buffer: &[u8], offset: usize, pattern: &Pattern) -> bool {
     let len = pattern.bytes.len();
-    
+
     // Check bounds
     if offset + len > buffer.len() {
         return false;
     }
-    
+
     // Prefetch next cache line (64 bytes ahead) to hide memory latency
     if offset + len + 64 < buffer.len() {
         #[cfg(target_arch = "x86_64")]
@@ -22,7 +22,7 @@ pub fn verify_pattern_scalar(buffer: &[u8], offset: usize, pattern: &Pattern) ->
             );
         }
     }
-    
+
     // Optimized scalar verification with early exit
     for i in 0..len {
         // Early exit on first mismatch
@@ -30,6 +30,6 @@ pub fn verify_pattern_scalar(buffer: &[u8], offset: usize, pattern: &Pattern) ->
             return false;
         }
     }
-    
+
     true
 }

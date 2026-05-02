@@ -2,14 +2,12 @@
 
 use std::ffi::c_void;
 
-use windows::{
-    Win32::{
-        Foundation::CloseHandle,
-        System::{
-            Diagnostics::Debug::WriteProcessMemory,
-            LibraryLoader::GetModuleHandleA,
-            Memory::{VirtualAllocEx, VirtualFreeEx, MEM_RELEASE, PAGE_READWRITE},
-        },
+use windows::Win32::{
+    Foundation::CloseHandle,
+    System::{
+        Diagnostics::Debug::WriteProcessMemory,
+        LibraryLoader::GetModuleHandleA,
+        Memory::{VirtualAllocEx, VirtualFreeEx, MEM_RELEASE, PAGE_READWRITE},
     },
 };
 
@@ -34,59 +32,86 @@ pub struct DiagnosticReport {
 impl DiagnosticReport {
     /// Check if injection is likely to succeed
     pub fn is_injection_feasible(&self) -> bool {
-        self.process_accessible 
-            && self.kernel32_loaded 
-            && self.memory_allocatable 
+        self.process_accessible
+            && self.kernel32_loaded
+            && self.memory_allocatable
             && self.memory_writable
     }
 
     /// Get human-readable summary
     pub fn summary(&self) -> String {
         let mut lines = Vec::new();
-        lines.push(format!("🔍 Injection Diagnostic Report for PID {}:", self.pid));
+        lines.push(format!(
+            "🔍 Injection Diagnostic Report for PID {}:",
+            self.pid
+        ));
         lines.push(String::from("─────────────────────────────────────────"));
-        
+
         lines.push(format!(
             "Process Accessible:      {}",
-            if self.process_accessible { "✅ Yes" } else { "❌ No" }
+            if self.process_accessible {
+                "✅ Yes"
+            } else {
+                "❌ No"
+            }
         ));
-        
+
         lines.push(format!(
             "kernel32.dll Loaded:     {}",
-            if self.kernel32_loaded { "✅ Yes" } else { "❌ No" }
+            if self.kernel32_loaded {
+                "✅ Yes"
+            } else {
+                "❌ No"
+            }
         ));
-        
+
         lines.push(format!(
             "Memory Allocatable:      {}",
-            if self.memory_allocatable { "✅ Yes" } else { "❌ No" }
+            if self.memory_allocatable {
+                "✅ Yes"
+            } else {
+                "❌ No"
+            }
         ));
-        
+
         lines.push(format!(
             "Memory Writable:         {}",
-            if self.memory_writable { "✅ Yes" } else { "❌ No" }
+            if self.memory_writable {
+                "✅ Yes"
+            } else {
+                "❌ No"
+            }
         ));
-        
+
         lines.push(String::from("─────────────────────────────────────────"));
-        
+
         if self.is_injection_feasible() {
             lines.push(String::from("✅ Injection should succeed!"));
         } else {
             lines.push(String::from("❌ Injection will likely fail. Issues:"));
-            
+
             if !self.process_accessible {
-                lines.push(String::from("   • Cannot open process - Run as Administrator"));
+                lines.push(String::from(
+                    "   • Cannot open process - Run as Administrator",
+                ));
             }
             if !self.kernel32_loaded {
-                lines.push(String::from("   • kernel32.dll not found - Process may be protected"));
+                lines.push(String::from(
+                    "   • kernel32.dll not found - Process may be protected",
+                ));
             }
             if !self.memory_allocatable {
-                lines.push(String::from("   • Cannot allocate memory - Insufficient permissions"));
+                lines.push(String::from(
+                    "   • Cannot allocate memory - Insufficient permissions",
+                ));
             }
             if !self.memory_writable {
-                lines.push(String::from("   • Cannot write memory - Anti-injection protection?"));
+                lines.push(String::from(
+                    "   • Cannot write memory - Anti-injection protection?",
+                ));
             }
         }
-        
+
         lines.join("\n")
     }
 }
@@ -131,14 +156,22 @@ pub fn diagnose_injection(pid: u32) -> Result<DiagnosticReport, DllInjectorError
 
             unsafe {
                 // Check 2: Is kernel32.dll accessible?
-                if GetModuleHandleA(windows::core::PCSTR::from_raw("kernel32.dll\0".as_ptr())).is_ok() {
+                if GetModuleHandleA(windows::core::PCSTR::from_raw("kernel32.dll\0".as_ptr()))
+                    .is_ok()
+                {
                     report.kernel32_loaded = true;
                 }
 
                 // Check 3: Can we allocate and write memory?
                 let test_size = 64;
-                let test_addr = VirtualAllocEx(handle, None, test_size, windows::Win32::System::Memory::MEM_COMMIT, PAGE_READWRITE);
-                
+                let test_addr = VirtualAllocEx(
+                    handle,
+                    None,
+                    test_size,
+                    windows::Win32::System::Memory::MEM_COMMIT,
+                    PAGE_READWRITE,
+                );
+
                 if !test_addr.is_null() {
                     report.memory_allocatable = true;
 
@@ -151,10 +184,11 @@ pub fn diagnose_injection(pid: u32) -> Result<DiagnosticReport, DllInjectorError
                         &test_data as *const u32 as *const c_void,
                         4,
                         Some(&mut bytes_written),
-                    ).is_ok();
-                    
+                    )
+                    .is_ok();
+
                     report.memory_writable = write_ok && bytes_written == 4;
-                    
+
                     // Cleanup
                     let _ = VirtualFreeEx(handle, test_addr, 0, MEM_RELEASE);
                 }
@@ -166,6 +200,6 @@ pub fn diagnose_injection(pid: u32) -> Result<DiagnosticReport, DllInjectorError
             report.process_accessible = false;
         }
     }
-    
+
     Ok(report)
 }

@@ -52,9 +52,9 @@
 //! └──────┴──────┴──────┴──────┘
 //! ```
 
-mod register;
 mod builder;
 mod extractor;
+mod register;
 
-pub use register::Register;
 pub use extractor::RegisterExtractor;
+pub use register::Register;

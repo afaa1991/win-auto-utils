@@ -12,10 +12,10 @@ use std::fmt;
 pub enum DCMode {
     /// Standard window DC using `GetWindowDC()`
     Standard = 1,
-    
+
     /// Window client area DC using `GetDC()` with client area
     WindowClient = 2,
-    
+
     /// Desktop DC for full-screen capture
     Desktop = 3,
 }
@@ -208,15 +208,13 @@ pub enum FilterCriterion {
 impl WindowFilter {
     /// Create a new empty filter
     pub fn new() -> Self {
-        Self {
-            rules: Vec::new(),
-        }
+        Self { rules: Vec::new() }
     }
-    
+
     // ==================== Convenience Constructors ====================
-    
+
     /// Create a filter that excludes invisible/hidden windows
-    /// 
+    ///
     /// # Example
     /// ```no_run
     /// use win_auto_utils::process::config::WindowFilter;
@@ -225,19 +223,19 @@ impl WindowFilter {
     pub fn new_exclude_invisible() -> Self {
         Self::new().exclude_invisible()
     }
-    
+
     /// Create a filter that includes only visible windows
     pub fn new_include_visible_only() -> Self {
         Self::new().include_visible_only()
     }
-    
+
     /// Create a filter that includes windows by title pattern
     pub fn new_include_by_title(title_pattern: &str) -> Self {
         Self::new().include_by_title(title_pattern)
     }
-    
+
     // ==================== Include Rules ====================
-    
+
     /// Add an include rule by window title (case-insensitive partial match)
     pub fn include_by_title(mut self, title_pattern: &str) -> Self {
         self.rules.push(FilterRule {
@@ -249,7 +247,7 @@ impl WindowFilter {
         });
         self
     }
-    
+
     /// Add an include rule by exact window title (case-sensitive)
     pub fn include_by_exact_title(mut self, title: &str) -> Self {
         self.rules.push(FilterRule {
@@ -261,7 +259,7 @@ impl WindowFilter {
         });
         self
     }
-    
+
     /// Add an include rule for visible windows only
     pub fn include_visible_only(mut self) -> Self {
         self.rules.push(FilterRule {
@@ -270,9 +268,9 @@ impl WindowFilter {
         });
         self
     }
-    
+
     // ==================== Exclude Rules ====================
-    
+
     /// Add an exclude rule by window title pattern
     pub fn exclude_by_title(mut self, title_pattern: &str) -> Self {
         self.rules.push(FilterRule {
@@ -284,7 +282,7 @@ impl WindowFilter {
         });
         self
     }
-    
+
     /// Add an exclude rule for invisible/hidden windows
     pub fn exclude_invisible(mut self) -> Self {
         self.rules.push(FilterRule {
@@ -293,7 +291,7 @@ impl WindowFilter {
         });
         self
     }
-    
+
     /// Check if this filter has any rules
     pub fn is_empty(&self) -> bool {
         self.rules.is_empty()
@@ -342,13 +340,13 @@ impl ProcessConfigBuilder {
             init_flags: InitFlags::default(),
         }
     }
-    
+
     // ==================== DC Mode Setters (Convenience Methods) ====================
-    
+
     /// Set DC mode to Standard (GetWindowDC)
-    /// 
+    ///
     /// This is the default mode. Uses `GetWindowDC()` to get the device context.
-    /// 
+    ///
     /// # Example
     /// ```no_run
     /// use win_auto_utils::process::ProcessConfig;
@@ -360,12 +358,12 @@ impl ProcessConfigBuilder {
         self.dc_mode = DCMode::Standard;
         self
     }
-    
+
     /// Set DC mode to Window Client (GetDC with client area)
-    /// 
+    ///
     /// Uses `GetDC()` to get the client area device context.
     /// This is often more suitable for game capture and overlay operations.
-    /// 
+    ///
     /// # Example
     /// ```no_run
     /// use win_auto_utils::process::ProcessConfig;
@@ -377,12 +375,12 @@ impl ProcessConfigBuilder {
         self.dc_mode = DCMode::WindowClient;
         self
     }
-    
+
     /// Set DC mode to Desktop (full-screen capture)
-    /// 
+    ///
     /// Uses desktop DC for full-screen capture operations.
     /// Useful when you need to capture the entire screen.
-    /// 
+    ///
     /// # Example
     /// ```no_run
     /// use win_auto_utils::process::ProcessConfig;
@@ -394,9 +392,9 @@ impl ProcessConfigBuilder {
         self.dc_mode = DCMode::Desktop;
         self
     }
-    
+
     /// Set the DC mode (advanced usage, requires importing DCMode enum)
-    /// 
+    ///
     /// For most cases, prefer using the convenience methods above:
     /// - `set_window_mode()`
     /// - `set_window_client_mode()`
@@ -405,43 +403,43 @@ impl ProcessConfigBuilder {
         self.dc_mode = mode;
         self
     }
-    
+
     /// Set the window filter directly
     pub fn window_filter(mut self, filter: WindowFilter) -> Self {
         self.window_filter = filter;
         self
     }
-    
+
     /// Add an include rule by window title (case-insensitive partial match)
     pub fn include_by_title(mut self, title_pattern: &str) -> Self {
         self.window_filter = self.window_filter.include_by_title(title_pattern);
         self
     }
-    
+
     /// Add an include rule by exact window title (case-sensitive)
     pub fn include_by_exact_title(mut self, title: &str) -> Self {
         self.window_filter = self.window_filter.include_by_exact_title(title);
         self
     }
-    
+
     /// Add an include rule for visible windows only
     pub fn include_visible_only(mut self) -> Self {
         self.window_filter = self.window_filter.include_visible_only();
         self
     }
-    
+
     /// Add an exclude rule by window title pattern
     pub fn exclude_by_title(mut self, title_pattern: &str) -> Self {
         self.window_filter = self.window_filter.exclude_by_title(title_pattern);
         self
     }
-    
+
     /// Add an exclude rule for invisible/hidden windows
     pub fn exclude_invisible(mut self) -> Self {
         self.window_filter = self.window_filter.exclude_invisible();
         self
     }
-    
+
     /// Set initialization flags for process resources
     ///
     /// Controls which resources (HWND, HANDLE, HDC) should be initialized.
@@ -460,7 +458,7 @@ impl ProcessConfigBuilder {
         self.init_flags = flags;
         self
     }
-    
+
     /// Build the final ProcessConfig
     pub fn build(self) -> ProcessConfig {
         ProcessConfig {
@@ -498,13 +496,13 @@ impl ProcessConfigBuilder {
 pub struct ProcessConfig {
     /// Target process name (e.g., "notepad.exe")
     pub process_name: String,
-    
+
     /// Device context acquisition mode
     pub dc_mode: DCMode,
-    
+
     /// Optional window filter for fine-grained selection
     pub window_filter: Option<WindowFilter>,
-    
+
     /// Initialization flags controlling which resources to initialize
     pub init_flags: InitFlags,
 }
@@ -519,7 +517,7 @@ impl ProcessConfig {
             init_flags: InitFlags::default(),
         }
     }
-    
+
     /// Create a builder for this process configuration
     ///
     /// This is the recommended way to create complex configurations.

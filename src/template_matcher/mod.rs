@@ -116,13 +116,13 @@ pub struct MatchResult {
     /// - 0.0: No correlation
     /// - -1.0: Inverse correlation
     pub similarity: f32,
-    
+
     /// Whether the match meets the threshold
     pub matched: bool,
-    
+
     /// Center X coordinate of matched region (0 if not matched)
     pub x: u32,
-    
+
     /// Center Y coordinate of matched region (0 if not matched)
     pub y: u32,
 }
@@ -196,14 +196,14 @@ pub fn match_region_from_gray(
     threshold: f32,
 ) -> Result<MatchResult, String> {
     validate_dimensions(x, y, width, height)?;
-    
+
     let template_width = template.width();
     let template_height = template.height();
-    
+
     if template_width == 0 || template_height == 0 {
         return Err("Template image is empty".to_string());
     }
-    
+
     if template_width > width as u32 || template_height > height as u32 {
         return Err(format!(
             "Template ({}x{}) is larger than search region ({}x{})",
@@ -228,12 +228,9 @@ pub fn match_region_from_gray(
             gray_data.push(gray);
         }
     }
-    
-    let gray_capture = image::GrayImage::from_raw(
-        width as u32,
-        height as u32,
-        gray_data,
-    ).ok_or_else(|| "Failed to create grayscale image from captured data".to_string())?;
+
+    let gray_capture = image::GrayImage::from_raw(width as u32, height as u32, gray_data)
+        .ok_or_else(|| "Failed to create grayscale image from captured data".to_string())?;
 
     // Perform template matching using parallel algorithm
     let _match_start = std::time::Instant::now();
@@ -311,7 +308,7 @@ pub fn match_region_from_dynamic(
 ) -> Result<MatchResult, String> {
     // Convert to grayscale for optimal performance
     let gray_template = template.to_luma8();
-    
+
     // Delegate to Layer 1
     match_region_from_gray(x, y, width, height, &gray_template, threshold)
 }
@@ -356,7 +353,7 @@ pub fn match_region_from_bytes(
     // Decode image from bytes
     let img = image::load_from_memory(image_data)
         .map_err(|e| format!("Failed to decode image: {}", e))?;
-    
+
     // Delegate to Layer 2
     match_region_from_dynamic(x, y, width, height, &img, threshold)
 }
@@ -396,11 +393,11 @@ pub fn match_region_from_path<P: AsRef<std::path::Path>>(
     threshold: f32,
 ) -> Result<MatchResult, String> {
     let path_str = path.as_ref().display().to_string();
-    
+
     // Load image from file
-    let img = image::open(&path)
-        .map_err(|e| format!("Failed to load image '{}': {}", path_str, e))?;
-    
+    let img =
+        image::open(&path).map_err(|e| format!("Failed to load image '{}': {}", path_str, e))?;
+
     // Delegate to Layer 2
     match_region_from_dynamic(x, y, width, height, &img, threshold)
 }
@@ -416,9 +413,9 @@ pub fn match_full_screen_from_gray(
     template: &GrayImage,
     threshold: f32,
 ) -> Result<MatchResult, String> {
-    let (width, height) = crate::dxgi::get_screen_size()
-        .map_err(|e| format!("Failed to get screen size: {}", e))?;
-    
+    let (width, height) =
+        crate::dxgi::get_screen_size().map_err(|e| format!("Failed to get screen size: {}", e))?;
+
     match_region_from_gray(0, 0, width as i32, height as i32, template, threshold)
 }
 
@@ -431,11 +428,11 @@ fn validate_dimensions(x: i32, y: i32, width: i32, height: i32) -> Result<(), St
     if width <= 0 || height <= 0 {
         return Err(format!("Invalid region dimensions: {}x{}", width, height));
     }
-    
+
     if x < 0 || y < 0 {
         return Err(format!("Invalid region position: ({}, {})", x, y));
     }
-    
+
     Ok(())
 }
 

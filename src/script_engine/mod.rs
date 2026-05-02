@@ -44,7 +44,7 @@ pub use engine::{InterruptController, ScriptConfig, ScriptEngine};
 pub use instruction::{
     CompiledInstruction, InstructionData, InstructionHandler, InstructionRegistry, ScriptError,
 };
-pub use vm::{VM, VMConfig, VMContext, VMRegisters};
+pub use vm::{VMConfig, VMContext, VMRegisters, VM};
 
 #[cfg(feature = "script_process_context")]
 pub use process_ctx::ProcessContext;

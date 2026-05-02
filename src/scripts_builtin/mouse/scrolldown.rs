@@ -229,7 +229,8 @@ impl InstructionHandler for ScrollDownHandler {
                     let window_x = params.x.unwrap_or(0);
                     let window_y = params.y.unwrap_or(0);
                     // Convert window coordinates to client coordinates for PostMessage
-                    let (client_x, client_y) = super::convert_to_client_coords(vm, window_x, window_y)?;
+                    let (client_x, client_y) =
+                        super::convert_to_client_coords(vm, window_x, window_y)?;
                     // Execute scroll N times for PostMessage mode
                     for _ in 0..params.delta {
                         mouse_message::post_scroll_down_atomic(

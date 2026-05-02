@@ -27,7 +27,7 @@ use crate::memory_resolver::resolver::{MemoryAddress, ParseError, PointerSize};
 /// use win_auto_utils::memory_resolver::MemoryAddress;
 ///
 /// let addr = MemoryAddress::builder()
-///     .address("lf2.exe+58C94->308")
+///     .address("app.exe+58C94->308")
 ///     .x86()  // 32-bit process
 ///     .build()?;
 /// # Ok::<_, Box<dyn std::error::Error>>(())
@@ -91,7 +91,7 @@ impl MemoryAddressBuilder {
     /// use win_auto_utils::memory_resolver::MemoryAddress;
     ///
     /// let addr = MemoryAddress::builder()
-    ///     .address("lf2.exe+58C94->308")
+    ///     .address("app.exe+58C94->308")
     ///     .x86()
     ///     .build()?;
     /// # Ok::<_, Box<dyn std::error::Error>>(())
@@ -142,16 +142,17 @@ impl MemoryAddressBuilder {
     /// # Ok::<_, Box<dyn std::error::Error>>(())
     /// ```
     pub fn build(self) -> Result<MemoryAddress, ParseError> {
-        let address_str = self.address_str
+        let address_str = self
+            .address_str
             .expect("MemoryAddressBuilder: address() must be called before build()");
-        
+
         let mut addr = MemoryAddress::parse(&address_str)?;
-        
+
         // Apply pointer size if configured
         if let Some(size) = self.pointer_size {
             addr.pointer_size = size;
         }
-        
+
         Ok(addr)
     }
 }
@@ -172,18 +173,21 @@ mod tests {
             .address("0x12345678")
             .build()
             .unwrap();
-        
-        assert!(matches!(addr.base, crate::memory_resolver::resolver::AddressBase::Absolute(_)));
+
+        assert!(matches!(
+            addr.base,
+            crate::memory_resolver::resolver::AddressBase::Absolute(_)
+        ));
     }
 
     #[test]
     fn test_builder_x86_shortcut() {
         let addr = MemoryAddressBuilder::new()
-            .address("lf2.exe+58C94->308")
+            .address("app.exe+58C94->308")
             .x86()
             .build()
             .unwrap();
-        
+
         assert_eq!(addr.pointer_size, PointerSize::Bits32);
     }
 
@@ -194,7 +198,7 @@ mod tests {
             .x64()
             .build()
             .unwrap();
-        
+
         assert_eq!(addr.pointer_size, PointerSize::Bits64);
     }
 
@@ -209,7 +213,7 @@ mod tests {
         let result = MemoryAddressBuilder::new()
             .address("invalid address string")
             .build();
-        
+
         assert!(result.is_err());
     }
 
@@ -220,11 +224,11 @@ mod tests {
             .address("test.exe+100")
             .build()
             .unwrap();
-        
+
         // Should match the compilation target architecture
         #[cfg(target_pointer_width = "64")]
         assert_eq!(addr.pointer_size, PointerSize::Bits64);
-        
+
         #[cfg(target_pointer_width = "32")]
         assert_eq!(addr.pointer_size, PointerSize::Bits32);
     }

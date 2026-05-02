@@ -10,12 +10,12 @@
 //!
 //! # Quick Start
 //!
-//! ## Method 1: Quick Parse Methods (Recommended for Simple Cases) ⭐⭐⭐
+//! ## Method 1: Quick Parse Methods (Recommended for Simple Cases)
 //! ```no_run
 //! use win_auto_utils::memory_resolver::MemoryAddress;
 //!
 //! // For x86 (32-bit) target processes (e.g., old games)
-//! let addr = MemoryAddress::new_x86("lf2.exe+58C94->308")?;
+//! let addr = MemoryAddress::new_x86("app.exe+58C94->308")?;
 //!
 //! // For x64 (64-bit) target processes (modern applications)
 //! let addr = MemoryAddress::new_x64("game.exe+1000->20")?;
@@ -25,12 +25,12 @@
 //! # Ok::<(), win_auto_utils::memory_resolver::ParseError>(())
 //! ```
 //!
-//! ## Method 2: Builder Pattern (For Complex Configuration) ⭐⭐
+//! ## Method 2: Builder Pattern (For Complex Configuration)
 //! ```no_run
 //! use win_auto_utils::memory_resolver::MemoryAddress;
 //!
 //! let addr = MemoryAddress::builder()
-//!     .address("lf2.exe+58C94->308")
+//!     .address("app.exe+58C94->308")
 //!     .x86()
 //!     .build()?;
 //! # Ok::<(), win_auto_utils::memory_resolver::ParseError>(())
@@ -51,7 +51,7 @@
 //!         .ok_or("Failed to open process")?;
 //!     
 //!     // Parse address string
-//!     let addr = MemoryAddress::new_x86("lf2.exe+58C94->308")?;
+//!     let addr = MemoryAddress::new_x86("app.exe+58C94->308")?;
 //!     
 //!     // Resolve to actual memory address
 //!     let resolved = addr.resolve_address(handle, pid)?;
@@ -88,9 +88,9 @@
 //! # Ok::<(), win_auto_utils::memory_resolver::ParseError>(())
 //! ```
 
+use crate::memory::MemoryError;
 use std::fmt;
 use windows::Win32::Foundation::HANDLE;
-use crate::memory::MemoryError;
 
 // ============================================================================
 // Error Types
@@ -101,25 +101,25 @@ use crate::memory::MemoryError;
 pub enum ParseError {
     /// Empty input string
     EmptyInput,
-    
+
     /// Invalid hexadecimal format
     InvalidHex(String),
-    
+
     /// Invalid decimal format
     InvalidDecimal(String),
-    
+
     /// Invalid offset format
     InvalidOffset(String),
-    
+
     /// Invalid module address format
     InvalidModuleFormat(String),
-    
+
     /// Invalid pointer jump syntax (expected '->')
     InvalidPointerSyntax(String),
-    
+
     /// Unexpected character in address string
     UnexpectedCharacter(char),
-    
+
     /// Multiple module names in one address
     MultipleModules,
 }
@@ -146,10 +146,10 @@ impl std::error::Error for ParseError {}
 pub enum ResolveError {
     /// Module not found by name
     ModuleNotFound(String),
-    
+
     /// Failed to read pointer during chain resolution
     PointerReadFailed(usize, MemoryError),
-    
+
     /// Null pointer encountered
     NullPointer(usize),
 }
@@ -159,10 +159,10 @@ impl fmt::Display for ResolveError {
         match self {
             ResolveError::ModuleNotFound(name) => {
                 write!(f, "Module '{}' not found in target process", name)
-            },
+            }
             ResolveError::PointerReadFailed(addr, e) => {
                 write!(f, "Failed to read pointer at 0x{:X}: {}", addr, e)
-            },
+            }
             ResolveError::NullPointer(addr) => {
                 write!(f, "Null pointer encountered at 0x{:X}", addr)
             }
@@ -177,7 +177,7 @@ impl std::error::Error for ResolveError {}
 pub enum PointerSize {
     /// 32-bit pointers (4 bytes) - for x86 processes
     Bits32,
-    
+
     /// 64-bit pointers (8 bytes) - for x64 processes
     Bits64,
 }
@@ -190,18 +190,18 @@ impl PointerSize {
             PointerSize::Bits64 => 8,
         }
     }
-    
+
     /// Get default pointer size based on compilation target architecture
-    /// 
+    ///
     /// This matches the native `usize` size of the compiled binary:
     /// - x86 (32-bit): Returns `PointerSize::Bits32`
     /// - x64 (64-bit): Returns `PointerSize::Bits64`
-    /// 
+    ///
     /// This is the recommended default for most use cases.
     pub fn default_architecture() -> Self {
         #[cfg(target_pointer_width = "64")]
         return PointerSize::Bits64;
-        
+
         #[cfg(target_pointer_width = "32")]
         return PointerSize::Bits32;
     }
@@ -278,7 +278,7 @@ impl MemoryAddress {
     /// use win_auto_utils::memory_resolver::MemoryAddress;
     ///
     /// let addr = MemoryAddress::builder()
-    ///     .address("lf2.exe+58C94->308")
+    ///     .address("app.exe+58C94->308")
     ///     .x86()
     ///     .build()?;
     /// # Ok::<_, Box<dyn std::error::Error>>(())
@@ -310,13 +310,13 @@ impl MemoryAddress {
         let mut chars = input.chars().peekable();
         let mut base = None;
         let mut operations = Vec::new();
-        
+
         // Check for 0x or 0X prefix (legacy hex format)
         if input.starts_with("0x") || input.starts_with("0X") {
             // Skip the "0x" prefix by consuming two characters
             chars.next(); // consume '0'
             chars.next(); // consume 'x' or 'X'
-            
+
             let address = Self::parse_number(&mut chars)?;
             base = Some(AddressBase::Absolute(address));
         }
@@ -328,22 +328,24 @@ impl MemoryAddress {
                 // Continue to parse operations after the base address
             }
         }
-        
+
         // Parse operations (+offset, ->offset, or module name)
         while let Some(&ch) = chars.peek() {
             match ch {
                 '-' => {
                     chars.next(); // consume '-'
                     if chars.next() != Some('>') {
-                        return Err(ParseError::InvalidPointerSyntax("Expected '>' after '-'".to_string()));
+                        return Err(ParseError::InvalidPointerSyntax(
+                            "Expected '>' after '-'".to_string(),
+                        ));
                     }
                     let offset = Self::parse_number(&mut chars)?;
                     operations.push(AddressOp::PointerJump(offset));
-                },
-                
+                }
+
                 '+' => {
                     chars.next(); // consume '+'
-                    
+
                     // Check if this is a 0x prefixed number
                     let next_chars: String = chars.clone().take(2).collect();
                     if next_chars == "0x" || next_chars == "0X" {
@@ -351,25 +353,25 @@ impl MemoryAddress {
                         chars.next(); // '0'
                         chars.next(); // 'x' or 'X'
                     }
-                    
+
                     let offset = Self::parse_number(&mut chars)?;
                     operations.push(AddressOp::DirectOffset(offset));
-                },
-                
+                }
+
                 _ if ch.is_alphabetic() || ch == '_' || ch == '.' => {
                     if base.is_none() {
                         base = Some(Self::parse_module_name(&mut chars)?);
                     } else {
                         return Err(ParseError::MultipleModules);
                     }
-                },
-                
+                }
+
                 _ => {
                     return Err(ParseError::UnexpectedCharacter(ch));
                 }
             }
         }
-        
+
         Ok(MemoryAddress {
             base: base.ok_or(ParseError::EmptyInput)?,
             operations,
@@ -383,7 +385,7 @@ impl MemoryAddress {
     /// Use this when targeting 32-bit processes like old games or legacy applications.
     ///
     /// # Arguments
-    /// * `input` - The address string to parse (e.g., "lf2.exe+58C94->308")
+    /// * `input` - The address string to parse (e.g., "app.exe+58C94->308")
     ///
     /// # Returns
     /// * `Ok(MemoryAddress)` - The parsed address with 32-bit pointer size
@@ -394,7 +396,7 @@ impl MemoryAddress {
     /// use win_auto_utils::memory_resolver::MemoryAddress;
     ///
     /// // Parse address for 32-bit process (e.g., old game)
-    /// let addr = MemoryAddress::new_x86("lf2.exe+58C94->308").unwrap();
+    /// let addr = MemoryAddress::new_x86("app.exe+58C94->308").unwrap();
     /// assert_eq!(addr.pointer_size, win_auto_utils::memory_resolver::PointerSize::Bits32);
     /// ```
     pub fn new_x86(input: &str) -> Result<Self, ParseError> {
@@ -428,25 +430,25 @@ impl MemoryAddress {
         addr.pointer_size = PointerSize::Bits64;
         Ok(addr)
     }
-    
+
     /// Parse a number (hex by default, decimal with '#' prefix)
     fn parse_number(chars: &mut std::iter::Peekable<std::str::Chars>) -> Result<usize, ParseError> {
         let mut num_str = String::new();
         let mut is_decimal = false;
-        
+
         if let Some(&'#') = chars.peek() {
             chars.next();
             is_decimal = true;
         }
-        
+
         // Check for 0x or 0X prefix (optional, for compatibility)
         let next_two: String = chars.clone().take(2).collect();
         if next_two == "0x" || next_two == "0X" {
             chars.next(); // consume '0'
             chars.next(); // consume 'x' or 'X'
-            // Continue to parse hex digits
+                          // Continue to parse hex digits
         }
-        
+
         while let Some(&ch) = chars.peek() {
             if ch.is_ascii_hexdigit() || ch == '_' {
                 num_str.push(ch);
@@ -455,26 +457,26 @@ impl MemoryAddress {
                 break;
             }
         }
-        
+
         if num_str.is_empty() {
             return Err(ParseError::InvalidOffset("Empty number".to_string()));
         }
-        
+
         num_str.retain(|c| c != '_');
-        
+
         if is_decimal {
-            usize::from_str_radix(&num_str, 10)
-                .map_err(|_| ParseError::InvalidDecimal(num_str))
+            usize::from_str_radix(&num_str, 10).map_err(|_| ParseError::InvalidDecimal(num_str))
         } else {
-            usize::from_str_radix(&num_str, 16)
-                .map_err(|_| ParseError::InvalidHex(num_str))
+            usize::from_str_radix(&num_str, 16).map_err(|_| ParseError::InvalidHex(num_str))
         }
     }
-    
+
     /// Parse module name (e.g., "app.dll", "target.exe")
-    fn parse_module_name(chars: &mut std::iter::Peekable<std::str::Chars>) -> Result<AddressBase, ParseError> {
+    fn parse_module_name(
+        chars: &mut std::iter::Peekable<std::str::Chars>,
+    ) -> Result<AddressBase, ParseError> {
         let mut name = String::new();
-        
+
         while let Some(&ch) = chars.peek() {
             if ch.is_alphanumeric() || ch == '_' || ch == '.' || ch == '-' {
                 name.push(ch);
@@ -483,21 +485,21 @@ impl MemoryAddress {
                 break;
             }
         }
-        
+
         if !name.contains(".dll") && !name.contains(".exe") {
             return Err(ParseError::InvalidModuleFormat(name));
         }
-        
+
         if let Some(&'+') = chars.peek() {
             chars.next(); // consume '+'
-            
+
             // Check for 0x prefix in module offset
             let next_chars: String = chars.clone().take(2).collect();
             if next_chars == "0x" || next_chars == "0X" {
                 chars.next(); // '0'
                 chars.next(); // 'x' or 'X'
             }
-            
+
             let offset = Self::parse_number(chars)?;
             Ok(AddressBase::Module { name, offset })
         } else {
@@ -518,7 +520,7 @@ impl MemoryAddress {
     /// use win_auto_utils::memory_resolver::{MemoryAddress, PointerSize};
     ///
     /// // For x86 (32-bit) process
-    /// let addr = MemoryAddress::parse("lf2.exe+58C94->308")?
+    /// let addr = MemoryAddress::parse("app.exe+58C94->308")?
     ///     .with_pointer_size(PointerSize::Bits32);
     ///
     /// // For x64 (64-bit) process
@@ -583,7 +585,8 @@ impl MemoryAddress {
                         PointerSize::Bits32 => {
                             // x86: Read 4-byte pointer
                             crate::memory::read_memory_u32(handle, current)
-                                .map_err(|e| ResolveError::PointerReadFailed(current, e))? as u64
+                                .map_err(|e| ResolveError::PointerReadFailed(current, e))?
+                                as u64
                         }
                         PointerSize::Bits64 => {
                             // x64: Read 8-byte pointer
@@ -591,7 +594,7 @@ impl MemoryAddress {
                                 .map_err(|e| ResolveError::PointerReadFailed(current, e))?
                         }
                     };
-                    
+
                     if ptr_value == 0 {
                         return Err(ResolveError::NullPointer(current));
                     }
@@ -602,7 +605,6 @@ impl MemoryAddress {
 
         Ok(current)
     }
-
 }
 
 #[cfg(test)]
@@ -678,11 +680,11 @@ mod tests {
 
     #[test]
     fn test_new_x86_shortcut() {
-        let addr = MemoryAddress::new_x86("lf2.exe+58C94->308").unwrap();
+        let addr = MemoryAddress::new_x86("app.exe+58C94->308").unwrap();
         assert_eq!(addr.pointer_size, PointerSize::Bits32);
         match addr.base {
             AddressBase::Module { name, offset } => {
-                assert_eq!(name, "lf2.exe");
+                assert_eq!(name, "app.exe");
                 assert_eq!(offset, 0x58C94);
             }
             _ => panic!("Expected Module base"),
@@ -705,11 +707,11 @@ mod tests {
     #[test]
     fn test_parse_default_architecture() {
         let addr = MemoryAddress::parse("test.exe+100").unwrap();
-        
+
         // Should match compilation target architecture
         #[cfg(target_pointer_width = "64")]
         assert_eq!(addr.pointer_size, PointerSize::Bits64);
-        
+
         #[cfg(target_pointer_width = "32")]
         assert_eq!(addr.pointer_size, PointerSize::Bits32);
     }

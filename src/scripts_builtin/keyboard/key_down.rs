@@ -105,7 +105,8 @@ impl InstructionHandler for KeyDownHandler {
                     return Err(ScriptError::ExecutionError(
                         "PostMessage mode requires 'script_process_context' feature. \
                          Enable it in Cargo.toml: features = [\"scripts_keyboard_with_post\"] \
-                         or use SendInput mode (default).".into()
+                         or use SendInput mode (default)."
+                            .into(),
                     ));
                 }
             }

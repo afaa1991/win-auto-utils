@@ -1,7 +1,7 @@
 //! BytesSwitch Builder - Fluent API for precise configuration
 //!
 //! This module provides the `BytesSwitchBuilder` for flexible switch configuration.
-//! 
+//!
 //! # Example
 //! ```no_run
 //! use win_auto_utils::memory_hook::BytesSwitch;
@@ -23,9 +23,9 @@
 //! # Ok::<_, Box<dyn std::error::Error>>(())
 //! ```
 
-use windows::Win32::Foundation::HANDLE;
-use crate::memory::MemoryError;
 use super::BytesSwitch;
+use crate::memory::MemoryError;
+use windows::Win32::Foundation::HANDLE;
 
 /// Builder for configuring BytesSwitch
 ///
@@ -106,13 +106,14 @@ impl BytesSwitchBuilder {
         // Validate required parameters
         let handle = self.handle.ok_or_else(|| {
             MemoryError::WriteFailed(
-                "handle must be set. Call .handle(handle) before build().".to_string()
+                "handle must be set. Call .handle(handle) before build().".to_string(),
             )
         })?;
 
         let target_address = self.target_address.ok_or_else(|| {
             MemoryError::WriteFailed(
-                "target_address must be set. Call .target_address(addr) before build().".to_string()
+                "target_address must be set. Call .target_address(addr) before build()."
+                    .to_string(),
             )
         })?;
 
@@ -127,7 +128,7 @@ impl BytesSwitchBuilder {
             use crate::memory::read_memory_bytes;
             let original = read_memory_bytes(handle, target_address, byte_count)?;
             let patch = vec![0x90; byte_count];
-            
+
             (original, patch)
         } else {
             // Manual mode: use provided bytes
@@ -139,23 +140,27 @@ impl BytesSwitchBuilder {
 
             let patch = self.patch_bytes.ok_or_else(|| {
                 MemoryError::WriteFailed(
-                    "patch_bytes must be set. Call .patch_bytes(bytes) or enable .nop_mode().".to_string()
+                    "patch_bytes must be set. Call .patch_bytes(bytes) or enable .nop_mode()."
+                        .to_string(),
                 )
             })?;
 
             if original.len() != patch.len() {
-                return Err(MemoryError::WriteFailed(
-                    format!(
-                        "Original and patch bytes length mismatch: {} vs {}",
-                        original.len(),
-                        patch.len()
-                    )
-                ));
+                return Err(MemoryError::WriteFailed(format!(
+                    "Original and patch bytes length mismatch: {} vs {}",
+                    original.len(),
+                    patch.len()
+                )));
             }
 
             (original, patch)
         };
 
-        Ok(BytesSwitch::new(handle, target_address, original_bytes, patch_bytes))
+        Ok(BytesSwitch::new(
+            handle,
+            target_address,
+            original_bytes,
+            patch_bytes,
+        ))
     }
 }

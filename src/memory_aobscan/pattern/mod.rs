@@ -2,8 +2,8 @@
 //!
 //! Provides pattern parsing, anchor selection, and related functionality.
 
-mod parser;
 pub(crate) mod anchor;
+mod parser;
 
 pub use parser::Pattern;
 // Note: find_rarest_byte_index is used internally by scanner, not exported publicly

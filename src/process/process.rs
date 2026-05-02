@@ -2,7 +2,9 @@
 //!
 //! Contains the main Process structure that combines configuration and runtime state.
 
-use crate::process::config::{DCMode, FilterCriterion, FilterRuleType, ProcessConfig, WindowFilter};
+use crate::process::config::{
+    DCMode, FilterCriterion, FilterRuleType, ProcessConfig, WindowFilter,
+};
 use crate::process::state::ProcessState;
 use windows::Win32::Foundation::{HANDLE, HWND};
 use windows::Win32::Graphics::Gdi::HDC;
@@ -501,7 +503,7 @@ impl Process {
 
         // Step 1: Get ALL PIDs matching the process name
         let all_pids = find_pids_by_name(process_name);
-        
+
         if all_pids.is_empty() {
             return Err(ProcessError::ProcessNotFound(process_name.to_string()));
         }
@@ -509,7 +511,7 @@ impl Process {
         // Step 2: Iterate through all processes and their windows
         for pid in &all_pids {
             let all_windows = get_hwnd_list_by_pid(*pid);
-            
+
             // Step 3: Apply filter rules to find matching window
             for hwnd in &all_windows {
                 if self.matches_filter(*hwnd, filter) {

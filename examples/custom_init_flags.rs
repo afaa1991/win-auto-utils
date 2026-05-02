@@ -12,7 +12,7 @@
 //! - **GUI-only**: PID + HWND + HDC for screen capture and GUI automation
 //! - **Custom**: Fine-grained control over each resource
 
-use win_auto_utils::process::{Process, ProcessConfig, InitFlags};
+use win_auto_utils::process::{InitFlags, Process, ProcessConfig};
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("=== Process Initialization Flags Example ===\n");
@@ -23,7 +23,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("   Use case: Full access to process resources");
     let config = ProcessConfig::builder("notepad.exe").build();
     let mut process = Process::new(config);
-    
+
     match process.init() {
         Ok(_) => {
             println!("   ✓ PID: {:?}", process.pid());
@@ -42,7 +42,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         .init_flags(InitFlags::minimal())
         .build();
     let mut process = Process::new(config);
-    
+
     match process.init() {
         Ok(_) => {
             println!("   ✓ PID: {:?}", process.pid());
@@ -61,7 +61,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         .init_flags(InitFlags::memory_only())
         .build();
     let mut process = Process::new(config);
-    
+
     match process.init() {
         Ok(_) => {
             println!("   ✓ PID: {:?}", process.pid());
@@ -80,7 +80,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         .init_flags(InitFlags::gui_only())
         .build();
     let mut process = Process::new(config);
-    
+
     match process.init() {
         Ok(_) => {
             println!("   ✓ PID: {:?}", process.pid());
@@ -98,14 +98,14 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let custom_flags = InitFlags::new()
         .with_pid(true)
         .with_hwnd(true)
-        .with_handle(false)  // Skip process handle
-        .with_dc(false);     // Skip device context
-    
+        .with_handle(false) // Skip process handle
+        .with_dc(false); // Skip device context
+
     let config = ProcessConfig::builder("notepad.exe")
         .init_flags(custom_flags)
         .build();
     let mut process = Process::new(config);
-    
+
     match process.init() {
         Ok(_) => {
             println!("   ✓ PID: {:?}", process.pid());

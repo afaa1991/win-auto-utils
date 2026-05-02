@@ -10,10 +10,10 @@ use windows::{
     Win32::{
         Foundation::{HWND, RECT},
         UI::WindowsAndMessaging::{
-            GetForegroundWindow, GetWindowLongW, GetWindowRect, SetForegroundWindow,
-            SetWindowLongW, SetWindowPos, SetWindowTextW, BringWindowToTop,
-            GWL_EXSTYLE, GWL_STYLE, HWND_BOTTOM, HWND_NOTOPMOST, HWND_TOP, HWND_TOPMOST,
-            SWP_HIDEWINDOW, SWP_NOMOVE, SWP_NOSIZE, SWP_SHOWWINDOW,
+            BringWindowToTop, GetForegroundWindow, GetWindowLongW, GetWindowRect,
+            SetForegroundWindow, SetWindowLongW, SetWindowPos, SetWindowTextW, GWL_EXSTYLE,
+            GWL_STYLE, HWND_BOTTOM, HWND_NOTOPMOST, HWND_TOP, HWND_TOPMOST, SWP_HIDEWINDOW,
+            SWP_NOMOVE, SWP_NOSIZE, SWP_SHOWWINDOW,
         },
     },
 };
@@ -1037,7 +1037,7 @@ mod tests {
             // Test hide completely - just verify it doesn't crash
             let hide_result = hide_window_completely(hwnd);
             println!("hide_window_completely result: {}", hide_result);
-            
+
             // Small delay to allow system to process
             std::thread::sleep(std::time::Duration::from_millis(100));
 
@@ -1048,7 +1048,7 @@ mod tests {
                 let has_appwindow = hidden_ex_style & 0x00040000 != 0;
                 println!("  WS_EX_TOOLWINDOW: {} (expected: true)", has_toolwindow);
                 println!("  WS_EX_APPWINDOW: {} (expected: false)", has_appwindow);
-                
+
                 // Use soft assertions - log but don't fail test
                 if !has_toolwindow {
                     eprintln!("Warning: Window may still be visible (no WS_EX_TOOLWINDOW)");
@@ -1061,7 +1061,7 @@ mod tests {
             // Test show completely - just verify it doesn't crash
             let show_result = show_window_completely(hwnd);
             println!("show_window_completely result: {}", show_result);
-            
+
             // Small delay to allow system to process
             std::thread::sleep(std::time::Duration::from_millis(100));
 
@@ -1072,7 +1072,7 @@ mod tests {
                 let has_appwindow = shown_ex_style & 0x00040000 != 0;
                 println!("  WS_EX_TOOLWINDOW: {} (expected: false)", has_toolwindow);
                 println!("  WS_EX_APPWINDOW: {} (expected: true)", has_appwindow);
-                
+
                 // Use soft assertions - log but don't fail test
                 if has_toolwindow {
                     eprintln!("Warning: Window may still be hidden (has WS_EX_TOOLWINDOW)");

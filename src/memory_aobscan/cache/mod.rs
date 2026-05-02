@@ -5,7 +5,7 @@
 pub(crate) mod region;
 
 // Note: get_valid_memory_regions is used internally by scanner, not exported publicly
-pub use cache_api::{clear_region_cache, clear_all_region_cache};
+pub use cache_api::{clear_all_region_cache, clear_region_cache};
 
 mod cache_api {
     use super::region::get_region_cache;

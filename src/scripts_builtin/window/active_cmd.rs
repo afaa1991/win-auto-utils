@@ -111,14 +111,17 @@ mod tests {
         // Should fail when no HWND is set
         let data = handler.parse(&[]).unwrap();
         let result = handler.execute(&mut context, &data, None);
-        
+
         assert!(result.is_err());
         let err = result.unwrap_err();
-        
+
         // get_hwnd_or_err returns ExecutionError with descriptive message
         match err {
             ScriptError::ExecutionError(msg) => {
-                assert!(msg.contains("window"), "Error message should mention window");
+                assert!(
+                    msg.contains("window"),
+                    "Error message should mention window"
+                );
             }
             _ => panic!("Expected ExecutionError, got: {:?}", err),
         }

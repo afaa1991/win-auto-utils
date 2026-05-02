@@ -7,8 +7,8 @@
 
 use windows::Win32::Foundation::{HWND, LPARAM, WPARAM};
 use windows::Win32::UI::WindowsAndMessaging::{
-    PostMessageW, WM_LBUTTONDOWN, WM_LBUTTONUP, WM_RBUTTONDOWN, WM_RBUTTONUP,
-    WM_MBUTTONDOWN, WM_MBUTTONUP, WM_MOUSEMOVE, WM_MOUSEWHEEL,
+    PostMessageW, WM_LBUTTONDOWN, WM_LBUTTONUP, WM_MBUTTONDOWN, WM_MBUTTONUP, WM_MOUSEMOVE,
+    WM_MOUSEWHEEL, WM_RBUTTONDOWN, WM_RBUTTONUP,
 };
 
 // ============================================================================
@@ -23,7 +23,7 @@ pub fn make_lparam(x: i32, y: i32) -> LPARAM {
 }
 
 /// Send left button click atomically
-/// 
+///
 /// # Performance
 /// Two direct PostMessage calls, no allocations or lookups
 #[inline]
@@ -83,7 +83,7 @@ pub fn post_move_atomic(hwnd: HWND, x: i32, y: i32) {
 }
 
 /// Send scroll up atomically
-/// 
+///
 /// # Parameters
 /// * `hwnd` - Target window handle
 /// * `x`, `y` - Coordinates where scroll occurs
@@ -92,7 +92,7 @@ pub fn post_move_atomic(hwnd: HWND, x: i32, y: i32) {
 pub fn post_scroll_up_atomic(hwnd: HWND, x: i32, y: i32, delta: i32) {
     let lparam = make_lparam(x, y);
     let wparam = ((delta as u32) << 16) as usize; // HIWORD = delta
-    
+
     unsafe {
         let _ = PostMessageW(Some(hwnd), WM_MOUSEWHEEL, WPARAM(wparam), lparam);
     }
@@ -131,7 +131,7 @@ impl std::error::Error for PostMessageMouseError {}
 // ============================================================================
 
 /// User-friendly PostMessage mouse controller
-/// 
+///
 /// Provides instance-based API for convenience.
 /// For maximum performance, use the atomic functions directly.
 pub struct PostMessageMouse {

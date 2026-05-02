@@ -7,13 +7,15 @@ use super::loop_cmd::{LoopRuntimeState, LOOP_STACK_KEY};
 #[cfg(feature = "scripts_timing")]
 use crate::scripts_builtin::timing::{TimeRuntimeState, TIME_STACK_KEY};
 
-use crate::script_engine::instruction::{InstructionData, InstructionHandler, InstructionMetadata, ScriptError};
+use crate::script_engine::instruction::{
+    InstructionData, InstructionHandler, InstructionMetadata, ScriptError,
+};
 use crate::script_engine::VMContext;
 
 /// Continue handler - skip to next iteration
 ///
 /// Syntax: `continue`
-/// 
+///
 /// Skips the remaining loop body and proceeds to the next iteration.
 /// Internally jumps to the 'end' instruction, which handles counter decrement
 /// and loop continuation checks, ensuring correct behavior even for single-iteration loops.
@@ -46,8 +48,9 @@ impl InstructionHandler for ContinueHandler {
         // First, try to continue in a time block (higher priority)
         #[cfg(feature = "scripts_timing")]
         {
-            let time_stack = vm.get_or_create_execution_state::<Vec<TimeRuntimeState>>(TIME_STACK_KEY);
-            
+            let time_stack =
+                vm.get_or_create_execution_state::<Vec<TimeRuntimeState>>(TIME_STACK_KEY);
+
             if !time_stack.is_empty() {
                 let time_state = time_stack.last().unwrap();
                 // Jump to the 'end' instruction to let it handle time checking
@@ -55,7 +58,7 @@ impl InstructionHandler for ContinueHandler {
                 return Ok(());
             }
         }
-        
+
         // Not in a time block, try loop stack
         let loop_stack = vm.get_or_create_execution_state::<Vec<LoopRuntimeState>>(LOOP_STACK_KEY);
 
@@ -67,7 +70,7 @@ impl InstructionHandler for ContinueHandler {
         }
 
         Err(ScriptError::ExecutionError(
-            "'continue' instruction used outside of any loop or time block".into()
+            "'continue' instruction used outside of any loop or time block".into(),
         ))
     }
 }

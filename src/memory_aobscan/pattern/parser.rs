@@ -10,7 +10,7 @@ pub struct Pattern {
     pub bytes: Vec<u8>,
     pub mask: Vec<bool>,
     pub mask_bytes: Vec<u8>, // Pre-computed mask: 0xFF for true, 0x00 for false (for SIMD)
-    
+
     // Multi-byte anchor sequence for heuristic optimization
     // Stores (offset, byte) pairs for 2-4 consecutive known bytes
     pub anchor_sequence: Option<Vec<(usize, u8)>>,
@@ -38,7 +38,7 @@ impl Pattern {
         let mut bytes = Vec::new();
         let mut mask = Vec::new();
         let mut mask_bytes = Vec::new();
-        
+
         for token in pattern_str.split_whitespace() {
             if token == "??" || token == "?" {
                 bytes.push(0);
@@ -55,17 +55,17 @@ impl Pattern {
                 }
             }
         }
-        
+
         if bytes.is_empty() {
             return Err("Pattern cannot be empty".to_string());
         }
-        
+
         // Find best multi-byte anchor sequence
         let anchor_sequence = find_best_anchor_sequence(&bytes, &mask);
-        
-        Ok(Self { 
-            bytes, 
-            mask, 
+
+        Ok(Self {
+            bytes,
+            mask,
             mask_bytes,
             anchor_sequence,
         })

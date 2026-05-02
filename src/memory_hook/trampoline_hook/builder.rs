@@ -41,9 +41,9 @@
 
 use windows::Win32::Foundation::HANDLE;
 
-use crate::memory::MemoryError;
 use super::TrampolineHook;
-use crate::memory_hook::{Architecture, utils::SendableHandle};
+use crate::memory::MemoryError;
+use crate::memory_hook::{utils::SendableHandle, Architecture};
 
 /// Builder for configuring TrampolineHook
 ///
@@ -57,7 +57,7 @@ pub struct TrampolineHookBuilder {
     original_bytes: Option<Vec<u8>>,
     bytes_to_overwrite: Option<usize>,
     architecture: Option<Architecture>,
-    skip_trampoline: bool,  // default: false (generate trampoline)
+    skip_trampoline: bool, // default: false (generate trampoline)
 }
 
 impl TrampolineHookBuilder {
@@ -215,21 +215,23 @@ impl TrampolineHookBuilder {
         // Validate required parameters
         let handle = self.handle.ok_or_else(|| {
             MemoryError::WriteFailed(
-                "handle must be set. Call .handle(handle) before build().".to_string()
+                "handle must be set. Call .handle(handle) before build().".to_string(),
             )
         })?;
 
         let target_address = self.target_address.ok_or_else(|| {
             MemoryError::WriteFailed(
                 "target_address must be set. Call .target_address(addr) before build(), \
-                 or use .handle(handle).target_address(addr).build() chain.".to_string()
+                 or use .handle(handle).target_address(addr).build() chain."
+                    .to_string(),
             )
         })?;
 
         let detour_code = self.detour_code.ok_or_else(|| {
             MemoryError::WriteFailed(
                 "detour_code must be set. TrampolineHook only supports auto-allocated detour. \
-                 Call .detour_code(shellcode) before build().".to_string()
+                 Call .detour_code(shellcode) before build()."
+                    .to_string(),
             )
         })?;
 
@@ -269,11 +271,11 @@ mod tests {
             .detour_code(shellcode)
             .x86()
             .build();
-        
+
         assert!(result.is_ok());
         // Hook created successfully
     }
-    
+
     #[test]
     fn test_builder_fluent_api() {
         let shellcode = vec![0x01, 0xD2];
@@ -284,32 +286,34 @@ mod tests {
             .x86()
             .bytes_to_overwrite(6)
             .build();
-        
+
         assert!(result.is_ok());
         // Hook created successfully with custom bytes_to_overwrite
     }
-    
+
     #[test]
     fn test_builder_clone_support() {
         let builder = TrampolineHookBuilder::new()
             .detour_code(vec![0x01, 0xD2])
             .x86();
-        
+
         // Clone and bind different parameters
-        let hook1 = builder.clone()
+        let hook1 = builder
+            .clone()
             .handle(HANDLE::default())
             .target_address(0x1000)
             .build();
-        
-        let hook2 = builder.clone()
+
+        let hook2 = builder
+            .clone()
             .handle(HANDLE::default())
             .target_address(0x2000)
             .build();
-        
+
         assert!(hook1.is_ok());
         assert!(hook2.is_ok());
     }
-    
+
     #[test]
     fn test_builder_validation_missing_handle() {
         let result = TrampolineHookBuilder::new()
@@ -317,13 +321,13 @@ mod tests {
             .detour_code(vec![0x01, 0xD2])
             .x86()
             .build();
-        
+
         assert!(result.is_err());
         if let Err(e) = result {
             assert!(e.to_string().contains("handle must be set"));
         }
     }
-    
+
     #[test]
     fn test_builder_validation_missing_target_address() {
         let result = TrampolineHookBuilder::new()
@@ -331,13 +335,13 @@ mod tests {
             .detour_code(vec![0x01, 0xD2])
             .x86()
             .build();
-        
+
         assert!(result.is_err());
         if let Err(e) = result {
             assert!(e.to_string().contains("target_address must be set"));
         }
     }
-    
+
     #[test]
     fn test_builder_validation_missing_detour_code() {
         let result = TrampolineHookBuilder::new()
@@ -345,7 +349,7 @@ mod tests {
             .target_address(0x1000)
             .x86()
             .build();
-        
+
         assert!(result.is_err());
         if let Err(e) = result {
             assert!(e.to_string().contains("detour_code must be set"));

@@ -118,7 +118,7 @@ impl InstructionHandler for ReleaseHandler {
                             Some((x, y))
                         }
                     }
-                    
+
                     #[cfg(not(feature = "script_process_context"))]
                     {
                         // Without process_context feature, coordinates are treated as screen coordinates
@@ -151,12 +151,13 @@ impl InstructionHandler for ReleaseHandler {
                 #[cfg(feature = "script_process_context")]
                 {
                     use crate::mouse::mouse_message;
-                    
+
                     // Use provided coordinates or default to (0, 0)
                     let window_x = params.x.unwrap_or(0);
                     let window_y = params.y.unwrap_or(0);
                     // Convert window coordinates to client coordinates for PostMessage
-                    let (client_x, client_y) = super::convert_to_client_coords(vm, window_x, window_y)?;
+                    let (client_x, client_y) =
+                        super::convert_to_client_coords(vm, window_x, window_y)?;
                     mouse_message::post_release_left_atomic(
                         vm.process.get_hwnd_or_err()?,
                         client_x,
@@ -169,7 +170,8 @@ impl InstructionHandler for ReleaseHandler {
                     return Err(ScriptError::ExecutionError(
                         "PostMessage mode requires 'script_process_context' feature. \
                          Enable it in Cargo.toml: features = [\"scripts_mouse_with_post\"] \
-                         or use SendInput mode (default).".into()
+                         or use SendInput mode (default)."
+                            .into(),
                     ));
                 }
             }

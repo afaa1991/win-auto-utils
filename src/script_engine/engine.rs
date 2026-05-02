@@ -103,7 +103,7 @@ use std::sync::{
 use super::compiler::{Compiler, CompilerConfig};
 use super::instruction::ScriptError;
 use super::parser::{Parser, ParserConfig};
-use super::{InstructionRegistry, VM, VMConfig};
+use super::{InstructionRegistry, VMConfig, VM};
 
 /// Interrupt controller for script execution
 ///

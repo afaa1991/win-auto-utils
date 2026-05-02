@@ -31,7 +31,6 @@
 ///
 /// println!("Compiled {} instructions", script.instructions.len());
 /// ```
-
 use super::instruction::InstructionRegistry;
 use super::instruction::{CompiledInstruction, InstructionMetadata, ScriptError};
 use super::parser::AstNode;
@@ -65,7 +64,7 @@ pub fn multi_type_block_pairing(
     block_types: &[(&str, &str)], // Array of (start_name, end_name) pairs
 ) -> Vec<Option<InstructionMetadata>> {
     let mut metadata_list = (0..instructions.len()).map(|_| None).collect::<Vec<_>>();
-    
+
     // Stack stores (start_ip, start_instruction_name)
     let mut stack: Vec<(usize, String)> = Vec::new();
 
@@ -73,7 +72,7 @@ pub fn multi_type_block_pairing(
         // Check if this instruction is a block start
         let mut is_start = false;
         let mut block_type_name = String::new();
-        
+
         for (start_name, _end_name) in block_types {
             if instr.name == *start_name {
                 is_start = true;
@@ -81,7 +80,7 @@ pub fn multi_type_block_pairing(
                 break;
             }
         }
-        
+
         if is_start {
             // Push start instruction IP and type onto stack
             stack.push((ip, block_type_name));
@@ -93,26 +92,31 @@ pub fn multi_type_block_pairing(
                     // Found an end instruction
                     if let Some((start_ip, start_type)) = stack.pop() {
                         // Create metadata for the start instruction
-                        metadata_list[start_ip] = Some(InstructionMetadata::new(GenericBlockMetadata {
-                            end_ip: ip,
-                            block_type: start_type.clone(),
-                        }));
+                        metadata_list[start_ip] =
+                            Some(InstructionMetadata::new(GenericBlockMetadata {
+                                end_ip: ip,
+                                block_type: start_type.clone(),
+                            }));
 
                         // Create metadata for the end instruction (only if not already set)
                         if metadata_list[ip].is_none() {
-                            metadata_list[ip] = Some(InstructionMetadata::new(TerminatorMetadata {
-                                start_ip,
-                                block_type: start_type,
-                            }));
+                            metadata_list[ip] =
+                                Some(InstructionMetadata::new(TerminatorMetadata {
+                                    start_ip,
+                                    block_type: start_type,
+                                }));
                         }
                         matched_end = true;
                     } else {
-                        eprintln!("Warning: Unmatched '{}' terminator at IP {}", instr.name, ip);
+                        eprintln!(
+                            "Warning: Unmatched '{}' terminator at IP {}",
+                            instr.name, ip
+                        );
                     }
                     break; // Only match once
                 }
             }
-            
+
             if !matched_end && !is_start {
                 // This is neither a start nor an end we care about
                 continue;
@@ -122,10 +126,7 @@ pub fn multi_type_block_pairing(
 
     // Validate unclosed blocks
     if !stack.is_empty() {
-        eprintln!(
-            "Warning: {} unclosed block(s) detected",
-            stack.len()
-        );
+        eprintln!("Warning: {} unclosed block(s) detected", stack.len());
         for (start_ip, start_type) in &stack {
             eprintln!(
                 "  - '{}' block starting at IP {} has no matching 'end'",
@@ -383,7 +384,11 @@ impl<'a> Compiler<'a> {
                                 else_name,
                                 end_name,
                             } => {
-                                conditional_blocks.push((if_name.to_string(), else_name.to_string(), end_name.to_string()));
+                                conditional_blocks.push((
+                                    if_name.to_string(),
+                                    else_name.to_string(),
+                                    end_name.to_string(),
+                                ));
                             }
                             BlockStructure::Custom { .. } => {
                                 eprintln!("Warning: Custom block structure not yet implemented");
@@ -400,15 +405,14 @@ impl<'a> Compiler<'a> {
                 .iter()
                 .map(|(s, e)| (s.as_str(), e.as_str()))
                 .collect();
-            
+
             let metadata = multi_type_block_pairing(instructions, &block_type_refs);
             self.merge_metadata(instructions, metadata);
         }
 
         // Apply conditional block pairing separately (if-else-end structures)
         for (if_name, else_name, end_name) in conditional_blocks {
-            let metadata =
-                pair_conditional_blocks(instructions, &if_name, &else_name, &end_name);
+            let metadata = pair_conditional_blocks(instructions, &if_name, &else_name, &end_name);
             self.merge_metadata(instructions, metadata);
         }
 

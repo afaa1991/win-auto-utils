@@ -46,46 +46,46 @@ pub fn generate_get_proc_addr_shellcode_x64(
     result_addr: usize,
 ) -> Vec<u8> {
     let mut code = Vec::new();
-    
+
     // Save registers
     code.extend_from_slice(&[0x50]); // push rax
     code.extend_from_slice(&[0x53]); // push rbx
     code.extend_from_slice(&[0x51]); // push rcx
     code.extend_from_slice(&[0x52]); // push rdx
-    
+
     // Align stack to 16 bytes
     code.extend_from_slice(&[0x48, 0x83, 0xEC, 0x28]); // sub rsp, 0x28
-    
+
     // Call GetProcAddress(module_handle, func_name_addr)
     // RCX = module_handle, RDX = func_name_addr
     code.extend_from_slice(&[0x48, 0xB9]); // mov rcx, imm64
     code.extend_from_slice(&(module_handle as u64).to_le_bytes());
-    
+
     code.extend_from_slice(&[0x48, 0xBA]); // mov rdx, imm64
     code.extend_from_slice(&(func_name_addr as u64).to_le_bytes());
-    
+
     // Call GetProcAddress
     code.extend_from_slice(&[0x48, 0xB8]); // mov rax, imm64
     code.extend_from_slice(&(get_proc_address as u64).to_le_bytes());
     code.extend_from_slice(&[0xFF, 0xD0]); // call rax
-    
+
     // Store result (RAX) to result_addr
     code.extend_from_slice(&[0x48, 0xBB]); // mov rbx, imm64
     code.extend_from_slice(&(result_addr as u64).to_le_bytes());
     code.extend_from_slice(&[0x48, 0x89, 0x03]); // mov [rbx], rax
-    
+
     // Restore stack
     code.extend_from_slice(&[0x48, 0x83, 0xC4, 0x28]); // add rsp, 0x28
-    
+
     // Restore registers
     code.extend_from_slice(&[0x5A]); // pop rdx
     code.extend_from_slice(&[0x59]); // pop rcx
     code.extend_from_slice(&[0x5B]); // pop rbx
     code.extend_from_slice(&[0x58]); // pop rax
-    
+
     // Return
     code.extend_from_slice(&[0xC3]); // ret
-    
+
     code
 }
 
@@ -128,27 +128,27 @@ pub fn generate_get_proc_addr_shellcode_x86(
     result_addr: usize,
 ) -> Vec<u8> {
     let mut code = Vec::new();
-    
+
     // Push parameters for GetProcAddress(module_handle, func_name_addr)
     // __stdcall: right-to-left
     code.extend_from_slice(&[0x68]); // push imm32
     code.extend_from_slice(&(func_name_addr as u32).to_le_bytes());
-    
+
     code.extend_from_slice(&[0x68]); // push imm32
     code.extend_from_slice(&(module_handle as u32).to_le_bytes());
-    
+
     // Call GetProcAddress
     code.extend_from_slice(&[0xB8]); // mov eax, imm32
     code.extend_from_slice(&(get_proc_address as u32).to_le_bytes());
     code.extend_from_slice(&[0xFF, 0xD0]); // call eax
-    
+
     // Store result (EAX) to result_addr
     code.extend_from_slice(&[0xBB]); // mov ebx, imm32
     code.extend_from_slice(&(result_addr as u32).to_le_bytes());
     code.extend_from_slice(&[0x89, 0x03]); // mov [ebx], eax
-    
+
     // Return
     code.extend_from_slice(&[0xC3]); // ret
-    
+
     code
 }

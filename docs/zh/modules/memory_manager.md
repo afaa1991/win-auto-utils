@@ -39,7 +39,7 @@ ModifierManager
 
 ### 基本用法
 
-``rust
+```rust
 use win_auto_utils::memory_manager::ModifierManager;
 use win_auto_utils::memory_manager::builtin::{LockHandler, BytesSwitchHandler};
 use win_auto_utils::process::ProcessManager;
@@ -82,24 +82,45 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
 ### 使用AOB模式扫描
 
-``rust
+```rust
 use win_auto_utils::memory_manager::builtin::TrampolineHookHandler;
-use win_auto_utils::memory_resolver::AddressSource;
 
-// 通过字节模式动态查找地址
+// 通过字节模式动态查找地址（架构自动检测）
 let shellcode = vec![0x90, 0x90]; // NOP指令
-let hook_handler = TrampolineHookHandler::new_x86_skip_trampoline(
+let hook_handler = TrampolineHookHandler::new_hook_aob_with_offset(
     "function_hook",
-    AddressSource::from_pattern_x86("target_app.exe+1F9C9")?,
+    "48 8B 05 ?? ?? ?? ??",  // AOB模式
+    shellcode,
+    2,                        // 覆盖字节数
+    0x10,                     // 偏移量
+)?;
+manager.register("function_hook", hook_handler);
+```
+
+### 使用自定义内存范围进行AOB扫描
+
+```rust
+use win_auto_utils::memory_manager::builtin::TrampolineHookHandler;
+
+// 在指定内存范围内扫描以提高性能
+let start_address = 0x10000000000usize;
+let length = 0x20000000000usize;
+
+let hook_handler = TrampolineHookHandler::new_hook_aob_with_range_and_offset(
+    "optimized_hook",
+    "48 8B 05 ?? ?? ?? ??",
     shellcode,
     2,
-);
-manager.register("function_hook", hook_handler);
+    start_address,
+    length,
+    0x10,
+)?;
+manager.register("optimized_hook", hook_handler);
 ```
 
 ### 批量操作
 
-``rust
+```rust
 // 激活所有已注册的修改器
 manager.activate_all()?;
 
@@ -119,7 +140,7 @@ for name in manager.list_handlers() {
 
 ### 完整示例：多功能管理
 
-``rust
+```rust
 use win_auto_utils::memory_manager::builtin::{
     BytesSwitchHandler, LockHandler, TrampolineHookHandler,
 };
@@ -211,57 +232,84 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 ### 内置处理器 (Built-in Handlers)
 
 #### LockHandler
-用于持续监控和恢复内存值（冻结效果）。
+用于持续监控和恢复内存值（冻结效果）。架构在激活时自动检测。
 
 **构造函数：**
-- `new_lock_x86_typed(name, address, value, interval)` - x86静态地址
-- `new_lock_x64_typed(name, address, value, interval)` - x64静态地址
-- `new_lock_aob_typed(name, pattern, value, interval)` - AOB模式扫描
+- `new_lock(name, address_pattern, value, interval)` - 静态地址，自动检测架构
+- `new_lock_aob(name, pattern, value, interval)` - AOB模式扫描
 
 **示例：**
 ```rust
-let handler = LockHandler::new_lock_x86_typed(
+use std::time::Duration;
+
+let handler = LockHandler::new_lock(
     "value_lock",
-    "target_app.exe+0x1000",
+    "target_app.exe+1000",  // 默认为十六进制，无需 0x 前缀
     100i32,
     Duration::from_millis(100),
 )?;
 ```
 
+**性能说明：**
+- **首次激活**：包括地址解析和线程创建（~50-100ms）
+- **后续激活**：复用现有线程实例（<1ms），同一进程内重新激活时
+- **停用**：停止监控线程但保留实例（~30-50µs）
+- **进程切换**：自动为新进程上下文重新创建实例
+
+---
+
 #### BytesSwitchHandler
-用于字节码切换（NOP补丁等）。
+用于字节码切换（NOP补丁等）。架构自动检测。
 
 **构造函数：**
-- `new_nop_switch_x86(name, address, length)` - x86 NOP切换
-- `new_nop_switch_x64(name, address, length)` - x64 NOP切换
-- `new_custom_switch_x86(name, address, original_bytes, modified_bytes)` - 自定义切换
+- `new_bytes_switch(name, address_pattern, byte_count, patch_bytes)` - 静态地址，自定义字节
+- `new_nop_switch(name, address_pattern, length)` - NOP切换
+- `new_bytes_switch_aob(name, pattern, byte_count, patch_bytes)` - AOB模式扫描
+- `new_nop_switch_aob(name, pattern, length)` - AOB NOP切换
 
 **示例：**
 ```rust
-let handler = BytesSwitchHandler::new_nop_switch_x86(
+let handler = BytesSwitchHandler::new_nop_switch(
     "nop_patch",
     "target_app.exe+0x2000",
     2,
 )?;
 ```
 
+**性能说明：**
+- **首次激活**：包括地址解析（AOB扫描约50-500ms）
+- **后续激活**：复用现有实例（<1ms），同一进程内重新激活时
+- **停用**：恢复原始字节但保留实例（~30-50µs）
+- **进程切换**：自动为新进程上下文重新创建实例
+
+---
+
 #### TrampolineHookHandler
-用于函数钩子，支持在拦截的同时保留原始功能。
+用于函数钩子，支持在拦截的同时保留原始功能。架构从目标进程自动检测。
 
 **构造函数：**
-- `new_x86_skip_trampoline(name, address_source, shellcode, bytes_to_overwrite)` - x86钩子
-- `new_x64_skip_trampoline(name, address_source, shellcode, bytes_to_overwrite)` - x64钩子
+- `new_hook_aob(name, pattern, shellcode, bytes_to_overwrite)` - AOB模式扫描
+- `new_hook_aob_with_offset(name, pattern, shellcode, bytes_to_overwrite, offset)` - AOB带偏移
+- `new_hook_aob_with_range_and_offset(name, pattern, shellcode, bytes_to_overwrite, start_address, length, offset)` - AOB自定义范围和偏移
+- `new_skip_trampoline_aob(name, pattern, shellcode, bytes_to_overwrite)` - 跳过蹦床模式（不调用原始函数）
 
 **示例：**
 ```rust
 let shellcode = vec![0x90, 0x90]; // NOP指令
-let handler = TrampolineHookHandler::new_x86_skip_trampoline(
+let handler = TrampolineHookHandler::new_hook_aob_with_offset(
     "func_hook",
-    AddressSource::from_static_x86("target_app.exe+0x3000")?,
+    "48 8B 05 ?? ?? ?? ??",
     shellcode,
     2,
-);
+    0x10,
+)?;
 ```
+
+**性能说明：**
+- **首次激活**：包括AOB扫描（根据内存大小约50-500ms）
+- **后续激活**：使用缓存地址（<1ms），同一进程内重新激活时
+- **停用**：快速操作（~30-50µs），保留地址缓存以快速重新激活
+- **进程切换**：切换到不同进程时自动清除缓存并重新扫描
 
 ## 最佳实践
 
@@ -269,7 +317,7 @@ let handler = TrampolineHookHandler::new_x86_skip_trampoline(
 
 确保在进程关闭前停用所有修改器：
 
-``rust
+```rust
 // 推荐：使用Drop自动清理
 {
     let mut manager = ModifierManager::new();
@@ -282,7 +330,7 @@ let handler = TrampolineHookHandler::new_x86_skip_trampoline(
 
 始终检查激活/停用操作的返回值：
 
-``rust
+```rust
 match manager.activate("feature_name") {
     Ok(_) => println!("Feature activated"),
     Err(e) => eprintln!("Failed to activate: {}", e),
@@ -293,7 +341,7 @@ match manager.activate("feature_name") {
 
 使用描述性的修改器名称：
 
-``rust
+```rust
 // ✅ 好的命名
 manager.register("value_monitor", monitor_handler);
 manager.register("func_interceptor", interceptor_handler);
@@ -319,15 +367,17 @@ for feature in &features {
 
 ### Q: 如何处理进程重启？
 
-A: 重新初始化进程后，需要重新设置上下文：
+A: 重新初始化进程后，重置上下文。管理器会自动检测变化并清除缓存：
 
 ```rust
 process_mgr.reinit("target_app.exe")?;
 let proc = process_mgr.get("target_app.exe").unwrap();
 manager.set_context(proc.handle().unwrap(), proc.pid().unwrap());
-// 重新激活需要的功能
+// 重新激活需要的功能（如果是同一进程会使用缓存地址）
 manager.activate_all()?;
 ```
+
+**注意**：`set_context()` 会自动停用所有处理器并清除 AOB 区域缓存，以确保在不同进程间安全切换。
 
 ### Q: 可以动态添加新的修改器吗？
 
@@ -355,6 +405,11 @@ if manager.is_active("hp_lock") {
 - **按需激活**: 未激活的修改器不消耗CPU资源
 - **后台线程**: LockHandler使用独立线程，不影响主线程性能
 - **批量操作**: `activate_all()`会串行执行，适合初始化阶段
+- **地址缓存**: AOB扫描结果会被缓存，同一进程内重新激活时速度更快
+  - 首次激活：~50-500ms（包括AOB扫描）
+  - 后续激活：<1ms（使用缓存地址）
+  - 停用：~30-50µs（保留缓存）
+- **实例复用**: 处理器在同一进程内重新激活时会复用内部实例，避免重建开销
 
 ## 相关模块
 

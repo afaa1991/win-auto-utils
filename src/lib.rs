@@ -4,9 +4,7 @@ pub mod process;
 
 // Re-export new process architecture components
 #[cfg(feature = "process")]
-pub use process::{
-    Process, ProcessConfig, ProcessManager,
-};
+pub use process::{Process, ProcessConfig, ProcessManager};
 
 #[cfg(feature = "hwnd")]
 pub mod hwnd;

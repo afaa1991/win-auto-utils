@@ -62,7 +62,7 @@ pub(super) fn allocate_detour_memory(
             // For x64, try code cave approach first (allocate near target)
             let hint_distance = 0x1000_0000; // 256MB
             let hint_address = target_address.wrapping_sub(hint_distance);
-            
+
             let allocated = unsafe {
                 VirtualAllocEx(
                     handle,

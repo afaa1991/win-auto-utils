@@ -152,7 +152,8 @@ pub fn set_text(text: &str) -> Result<(), ClipboardError> {
             // GlobalUnlock may return error if lock count is already 0, which is OK
             // Check if it's a real error or just "already unlocked"
             let last_error = windows::Win32::Foundation::GetLastError().0;
-            if last_error != 0 && last_error != 6 {  // ERROR_INVALID_HANDLE = 6
+            if last_error != 0 && last_error != 6 {
+                // ERROR_INVALID_HANDLE = 6
                 CloseClipboard().ok();
                 return Err(ClipboardError::MemoryUnlockFailed);
             }
@@ -332,11 +333,11 @@ mod tests {
     #[test]
     fn test_set_and_get_text() {
         let test_text = "Hello, Clipboard!";
-        
+
         // Set text
         let result = set_text(test_text);
         assert!(result.is_ok(), "Failed to set text: {:?}", result);
-        
+
         // Get text
         let retrieved = get_text().expect("Failed to get text");
         assert_eq!(retrieved, test_text);
@@ -346,10 +347,10 @@ mod tests {
     fn test_clear_clipboard() {
         // Set some text first
         set_text("Test text").ok();
-        
+
         // Clear it
         assert!(clear().is_ok(), "Failed to clear clipboard");
-        
+
         // Note: After clearing, has_text might still return true on some systems
         // because other processes might have set clipboard content
     }
@@ -357,10 +358,10 @@ mod tests {
     #[test]
     fn test_unicode_text() {
         let unicode_text = "你好世界！🌍 こんにちは";
-        
+
         let result = set_text(unicode_text);
         assert!(result.is_ok(), "Failed to set unicode text: {:?}", result);
-        
+
         let retrieved = get_text().expect("Failed to get unicode text");
         assert_eq!(retrieved, unicode_text);
     }
@@ -369,7 +370,7 @@ mod tests {
     fn test_empty_string() {
         let result = set_text("");
         assert!(result.is_ok(), "Failed to set empty string: {:?}", result);
-        
+
         let retrieved = get_text().expect("Failed to get empty string");
         assert_eq!(retrieved, "");
     }
@@ -377,10 +378,10 @@ mod tests {
     #[test]
     fn test_long_text() {
         let long_text = "A".repeat(10000);
-        
+
         let result = set_text(&long_text);
         assert!(result.is_ok(), "Failed to set long text: {:?}", result);
-        
+
         let retrieved = get_text().expect("Failed to get long text");
         assert_eq!(retrieved, long_text);
     }

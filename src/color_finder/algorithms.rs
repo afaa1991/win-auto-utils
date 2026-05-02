@@ -24,7 +24,7 @@
 //! let width = 100i32;
 //! let height = 100i32;
 //! let mut buffer = vec![0u8; (width * height * 4) as usize];
-//! 
+//!
 //! // Set a blue pixel at position (50, 50)
 //! let idx = ((50 * width + 50) * 4) as usize;
 //! buffer[idx] = 255;     // B
@@ -329,12 +329,7 @@ unsafe fn find_color_avx2(colors: &[u8], w: i32, target: (u8, u8, u8)) -> Option
 /// # Notes
 /// - Coordinates are local to the buffer (not screen coordinates)
 /// - For screen capture integration, see the `dxgi` feature
-pub fn find_color_in_buffer(
-    colors: &[u8],
-    w: i32,
-    _h: i32,
-    target: (u8, u8, u8),
-) -> FindResult {
+pub fn find_color_in_buffer(colors: &[u8], w: i32, _h: i32, target: (u8, u8, u8)) -> FindResult {
     let mut result = FindResult::default();
 
     // Automatically select optimal implementation
@@ -383,21 +378,21 @@ mod tests {
         let height = 100i32;
         let bg_color = (100, 100, 100);
         let target_color = (255, 0, 0); // Red
-        
+
         let mut buffer = create_solid_image(width, height, bg_color);
-        
+
         // Place target at position (50, 50)
         let target_x = 50;
         let target_y = 50;
         let target_idx = ((target_y * width + target_x) * 4) as usize;
-        
-        buffer[target_idx] = target_color.0;     // B
+
+        buffer[target_idx] = target_color.0; // B
         buffer[target_idx + 1] = target_color.1; // G
         buffer[target_idx + 2] = target_color.2; // R
-        buffer[target_idx + 3] = 255;            // A
-        
+        buffer[target_idx + 3] = 255; // A
+
         let result = find_color_in_buffer(&buffer, width, height, target_color);
-        
+
         assert!(result.matched, "Should find the color");
         assert_eq!(result.x, target_x, "X coordinate mismatch");
         assert_eq!(result.y, target_y, "Y coordinate mismatch");
@@ -408,11 +403,11 @@ mod tests {
         let width = 100i32;
         let height = 100i32;
         let bg_color = (100, 100, 100);
-        
+
         let buffer = create_solid_image(width, height, bg_color);
-        
+
         let result = find_color_in_buffer(&buffer, width, height, (255, 0, 0));
-        
+
         assert!(!result.matched, "Should not find the color");
     }
 }

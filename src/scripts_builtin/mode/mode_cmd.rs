@@ -27,7 +27,6 @@
 //! mode performance_level max # Maximize performance
 //! ```
 
-
 use crate::script_engine::instruction::{
     InstructionData, InstructionHandler, InstructionMetadata, ScriptError,
 };
@@ -121,15 +120,15 @@ mod tests {
     #[test]
     fn test_parse_mode_missing_parameters() {
         let handler = ModeHandler;
-        
+
         // No parameters
         let result = handler.parse(&[]);
         assert!(result.is_err());
-        
+
         // Only one parameter
         let result = handler.parse(&["input_mode"]);
         assert!(result.is_err());
-        
+
         // Too many parameters
         let result = handler.parse(&["input_mode", "post", "extra"]);
         assert!(result.is_err());

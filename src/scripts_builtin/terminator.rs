@@ -21,25 +21,29 @@ use std::collections::HashMap;
 use std::sync::{OnceLock, RwLock};
 
 use crate::script_engine::compiler::TerminatorMetadata;
-use crate::script_engine::instruction::{InstructionData, InstructionHandler, InstructionMetadata, ScriptError};
+use crate::script_engine::instruction::{
+    InstructionData, InstructionHandler, InstructionMetadata, ScriptError,
+};
 use crate::script_engine::VMContext;
 
 /// Type alias for block termination handler function
-/// 
+///
 /// Parameters:
 /// - `vm`: The VM context
 /// - `metadata`: The terminator metadata from compilation (contains start_ip, block_type, etc.)
-/// 
+///
 /// Returns:
 /// - `Ok(next_ip)`: The next instruction pointer to execute
 /// - `Err(error)`: Execution error
-type TerminatorHandlerFn = Box<dyn Fn(&mut VMContext, &TerminatorMetadata) -> Result<usize, ScriptError> + Send + Sync>;
+type TerminatorHandlerFn =
+    Box<dyn Fn(&mut VMContext, &TerminatorMetadata) -> Result<usize, ScriptError> + Send + Sync>;
 
 /// Global registry for block termination handlers
-/// 
+///
 /// Note: Uses OnceLock with interior mutability to allow initialization after first use.
 /// Registration happens during startup (before any script execution).
-static TERMINATOR_REGISTRY: OnceLock<RwLock<HashMap<String, TerminatorHandlerFn>>> = OnceLock::new();
+static TERMINATOR_REGISTRY: OnceLock<RwLock<HashMap<String, TerminatorHandlerFn>>> =
+    OnceLock::new();
 
 /// Get or initialize the global terminator registry
 #[inline]
@@ -80,7 +84,10 @@ impl TerminatorHandler {
     /// ```
     pub fn register_handler<F>(block_type: &str, handler: F)
     where
-        F: Fn(&mut VMContext, &TerminatorMetadata) -> Result<usize, ScriptError> + Send + Sync + 'static,
+        F: Fn(&mut VMContext, &TerminatorMetadata) -> Result<usize, ScriptError>
+            + Send
+            + Sync
+            + 'static,
     {
         let mut registry = get_registry().write().unwrap();
         registry.insert(block_type.to_string(), Box::new(handler));

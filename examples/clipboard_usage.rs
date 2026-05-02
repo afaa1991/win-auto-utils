@@ -1,7 +1,7 @@
 //! Clipboard usage example
 //!
 //! This example demonstrates how to use the clipboard module.
-//! 
+//!
 //! Run with: `cargo run --example clipboard_usage --features "clipboard"`
 
 #[cfg(feature = "clipboard")]

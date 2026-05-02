@@ -19,7 +19,7 @@ use windows::Win32::System::Memory::{VirtualFreeEx, MEM_RELEASE};
 /// and a jump back to the original function after the hook point.
 ///
 /// # Memory Management
-/// 
+///
 /// TrampolineHook automatically allocates and manages both detour and trampoline memory.
 /// The memory is freed when the hook is uninstalled or dropped.
 ///
@@ -45,7 +45,7 @@ pub struct TrampolineHook {
     pub bytes_to_overwrite: usize,
     pub is_installed: bool,
     pub architecture: Architecture,
-    pub skip_trampoline: bool,         // Skip trampoline generation, JMP directly to target+bytes
+    pub skip_trampoline: bool, // Skip trampoline generation, JMP directly to target+bytes
 }
 
 impl TrampolineHook {
@@ -105,7 +105,7 @@ impl TrampolineHook {
     /// By default, this uses architecture-specific minimums for bytes_to_overwrite:
     /// - x86: 5 bytes (minimum for relative JMP)
     /// - x64: 14 bytes (for absolute JMP via RAX)
-    /// 
+    ///
     /// If your target instruction is shorter/longer, call `set_bytes_to_overwrite()` BEFORE `install()`.
     ///
     /// # Example
@@ -122,11 +122,7 @@ impl TrampolineHook {
     /// hook.install()?;
     /// hook.uninstall()?;
     /// ```
-    pub fn auto_new(
-        handle: HANDLE,
-        target_address: usize,
-        detour_code: Vec<u8>,
-    ) -> Self {
+    pub fn auto_new(handle: HANDLE, target_address: usize, detour_code: Vec<u8>) -> Self {
         Self {
             handle: SendableHandle(handle),
             target_address,
@@ -307,7 +303,7 @@ impl TrampolineHook {
         self.detour_code = None; // Clear shellcode cache too
         self.bytes_to_overwrite = 0;
         self.is_installed = false;
-        self.skip_trampoline = false;         // Reset to default
+        self.skip_trampoline = false; // Reset to default
     }
 
     /// Install the trampoline hook
@@ -339,8 +335,8 @@ impl TrampolineHook {
 
         // Step 1: Auto-calculate bytes_to_overwrite if not explicitly set
         let min_bytes = match self.architecture {
-            Architecture::X86 => 5,   // Minimum for JMP rel32
-            Architecture::X64 => 5,   // Minimum for JMP rel32 (will use absolute if needed)
+            Architecture::X86 => 5, // Minimum for JMP rel32
+            Architecture::X64 => 5, // Minimum for JMP rel32 (will use absolute if needed)
         };
 
         if self.bytes_to_overwrite == 0 {
@@ -348,16 +344,11 @@ impl TrampolineHook {
             self.bytes_to_overwrite = min_bytes;
         } else if self.bytes_to_overwrite < min_bytes {
             // User specified but it's too small
-            return Err(MemoryError::WriteFailed(
-                format!(
-                    "bytes_to_overwrite ({}) is less than minimum required for {:?} ({} bytes). \
+            return Err(MemoryError::WriteFailed(format!(
+                "bytes_to_overwrite ({}) is less than minimum required for {:?} ({} bytes). \
                      JMP instruction needs at least {} bytes.",
-                    self.bytes_to_overwrite,
-                    self.architecture,
-                    min_bytes,
-                    min_bytes
-                )
-            ));
+                self.bytes_to_overwrite, self.architecture, min_bytes, min_bytes
+            )));
         }
 
         // Step 2: Read original bytes
@@ -367,14 +358,15 @@ impl TrampolineHook {
         // CRITICAL: Verify that we're reading original code, not an existing hook
         if !self.original_bytes.is_empty() {
             let first_byte = self.original_bytes[0];
-            
+
             // Check for common hook signatures
             match first_byte {
                 0xE9 => {
                     // Relative JMP (E9 xx xx xx xx)
-                    return Err(MemoryError::WriteFailed(
-                        format!("Target address 0x{:X} is already hooked (starts with JMP)", self.target_address)
-                    ));
+                    return Err(MemoryError::WriteFailed(format!(
+                        "Target address 0x{:X} is already hooked (starts with JMP)",
+                        self.target_address
+                    )));
                 }
                 0xFF => {
                     // Absolute JMP or CALL (FF /4 or FF /2)
@@ -396,7 +388,7 @@ impl TrampolineHook {
                 detour_size,
                 self.architecture,
             )?;
-            
+
             // 🔒 CRITICAL SAFETY CHECK: Verify that Target → Detour jump will fit within bytes_to_overwrite
             // This MUST be done BEFORE writing any code to prevent silent corruption of subsequent instructions
             let jump_src = self.target_address;
@@ -406,14 +398,14 @@ impl TrampolineHook {
             } else {
                 jump_src - jump_dst
             };
-            
+
             // Determine required jump instruction size based on distance
             let required_jump_size = if distance <= 0x7FFF_FFFF {
-                5  // E9 relative jump (within ±2GB)
+                5 // E9 relative jump (within ±2GB)
             } else {
                 13 // MOV R11 + JMP R11 absolute jump (beyond ±2GB)
             };
-            
+
             // SAFETY VALIDATION: Ensure we won't overwrite more bytes than allowed
             if required_jump_size > self.bytes_to_overwrite {
                 return Err(MemoryError::WriteFailed(
@@ -447,11 +439,11 @@ impl TrampolineHook {
                     )
                 ));
             }
-            
+
             // Build complete detour code: shellcode + JMP to trampoline (or target)
             // (We'll add the JMP after we know trampoline/target address)
             write_memory_bytes(self.handle.0, detour_alloc, shellcode)?;
-            
+
             self.detour_address = detour_alloc;
             detour_alloc
         } else {
@@ -479,43 +471,45 @@ impl TrampolineHook {
                 let shellcode_len = self.detour_code.as_ref().unwrap().len();
                 let jmp_src = detour_addr + shellcode_len;
                 let jmp_dst = trampoline_addr;
-                
+
                 // Calculate distance to determine jump type
                 let distance = if jmp_dst > jmp_src {
                     jmp_dst - jmp_src
                 } else {
                     jmp_src - jmp_dst
                 };
-                
+
                 // Use relative jump if within 2GB, otherwise absolute jump
                 if distance <= 0x7FFF_FFFF {
                     // Within 2GB: use E9 relative jump (5 bytes)
                     let offset = (jmp_dst as i64).wrapping_sub((jmp_src + 5) as i64);
-                    
+
                     if offset < i32::MIN as i64 || offset > i32::MAX as i64 {
-                        return Err(MemoryError::WriteFailed("Detour and Trampoline too far for relative jump".to_string()));
+                        return Err(MemoryError::WriteFailed(
+                            "Detour and Trampoline too far for relative jump".to_string(),
+                        ));
                     }
 
                     let mut jmp_code = vec![0xE9]; // JMP rel32
                     jmp_code.extend_from_slice(&(offset as i32).to_le_bytes());
-                    
+
                     write_memory_bytes(self.handle.0, jmp_src, &jmp_code)?;
                 } else {
                     // Beyond 2GB: use absolute jump via R11 (13 bytes)
                     // Note: This writes to detour memory (which we allocated), NOT target memory
                     // So bytes_to_overwrite does NOT limit this operation
-                    
+
                     let mut builder = ShellcodeBuilder::new_x64();
                     builder.jmp_absolute(jmp_dst);
                     let jmp_code = builder.build();
-                    
+
                     write_memory_bytes(self.handle.0, jmp_src, &jmp_code)?;
                 }
             }
 
             // Step 6: Build and write trampoline code
             let trampoline_code = self.build_trampoline_code(trampoline_addr)?;
-            
+
             write_memory_bytes(self.handle.0, trampoline_addr, &trampoline_code)?;
 
             trampoline_addr
@@ -526,36 +520,38 @@ impl TrampolineHook {
             let shellcode_len = self.detour_code.as_ref().unwrap().len();
             let jmp_src = detour_addr + shellcode_len;
             let jmp_dst = self.target_address + self.bytes_to_overwrite;
-            
+
             // Calculate distance to determine jump type
             let distance = if jmp_dst > jmp_src {
                 jmp_dst - jmp_src
             } else {
                 jmp_src - jmp_dst
             };
-            
+
             // Use relative jump if within 2GB, otherwise absolute jump
             if distance <= 0x7FFF_FFFF {
                 // Within 2GB: use E9 relative jump (5 bytes)
                 let offset = (jmp_dst as i64).wrapping_sub((jmp_src + 5) as i64);
-                
+
                 if offset < i32::MIN as i64 || offset > i32::MAX as i64 {
-                    return Err(MemoryError::WriteFailed("Detour and target too far for relative jump".to_string()));
+                    return Err(MemoryError::WriteFailed(
+                        "Detour and target too far for relative jump".to_string(),
+                    ));
                 }
 
                 let mut jmp_code = vec![0xE9]; // JMP rel32
                 jmp_code.extend_from_slice(&(offset as i32).to_le_bytes());
-                
+
                 write_memory_bytes(self.handle.0, jmp_src, &jmp_code)?;
             } else {
                 // Beyond 2GB: use absolute jump via R11 (13 bytes)
                 // Note: This writes to detour memory (which we allocated), NOT target memory
                 // So bytes_to_overwrite does NOT limit this operation
-                
+
                 let mut builder = ShellcodeBuilder::new_x64();
                 builder.jmp_absolute(jmp_dst);
                 let jmp_code = builder.build();
-                
+
                 write_memory_bytes(self.handle.0, jmp_src, &jmp_code)?;
             }
         }
@@ -588,21 +584,18 @@ impl TrampolineHook {
         // Free trampoline memory if it exists
         if let Some(addr) = self.trampoline_address {
             unsafe {
-                let result = VirtualFreeEx(
-                    self.handle.0, 
-                    addr as *mut std::ffi::c_void, 
-                    0, 
-                    MEM_RELEASE
-                );
+                let result =
+                    VirtualFreeEx(self.handle.0, addr as *mut std::ffi::c_void, 0, MEM_RELEASE);
 
                 match result {
                     Ok(()) => {
                         // Successfully freed
                     }
                     Err(e) => {
-                        return Err(MemoryError::WriteFailed(
-                            format!("Failed to free trampoline memory at 0x{:X}: {:?}", addr, e)
-                        ));
+                        return Err(MemoryError::WriteFailed(format!(
+                            "Failed to free trampoline memory at 0x{:X}: {:?}",
+                            addr, e
+                        )));
                     }
                 }
             }
@@ -612,10 +605,10 @@ impl TrampolineHook {
         if self.detour_code.is_some() && self.detour_address != 0 {
             unsafe {
                 let result = VirtualFreeEx(
-                    self.handle.0, 
-                    self.detour_address as *mut std::ffi::c_void, 
-                    0, 
-                    MEM_RELEASE
+                    self.handle.0,
+                    self.detour_address as *mut std::ffi::c_void,
+                    0,
+                    MEM_RELEASE,
                 );
 
                 match result {
@@ -623,9 +616,10 @@ impl TrampolineHook {
                         // Successfully freed
                     }
                     Err(e) => {
-                        return Err(MemoryError::WriteFailed(
-                            format!("Failed to free detour memory at 0x{:X}: {:?}", self.detour_address, e)
-                        ));
+                        return Err(MemoryError::WriteFailed(format!(
+                            "Failed to free detour memory at 0x{:X}: {:?}",
+                            self.detour_address, e
+                        )));
                     }
                 }
             }
@@ -709,11 +703,13 @@ impl TrampolineHook {
             let padding_size = self.bytes_to_overwrite - jump_size;
             let mut final_code = jump_code.clone();
             final_code.extend_from_slice(&vec![0x90; padding_size]); // NOP padding
-            
-            let _guard = ProtectionGuard::new(self.handle.0, self.target_address, self.bytes_to_overwrite)?;
+
+            let _guard =
+                ProtectionGuard::new(self.handle.0, self.target_address, self.bytes_to_overwrite)?;
             write_memory_bytes(self.handle.0, self.target_address, &final_code)?;
         } else {
-            let _guard = ProtectionGuard::new(self.handle.0, self.target_address, self.bytes_to_overwrite)?;
+            let _guard =
+                ProtectionGuard::new(self.handle.0, self.target_address, self.bytes_to_overwrite)?;
             write_memory_bytes(self.handle.0, self.target_address, &jump_code)?;
         }
 
@@ -752,7 +748,7 @@ impl TrampolineHook {
                     )
                 ));
             }
-            
+
             builder.jmp_absolute(self.detour_address);
         }
 

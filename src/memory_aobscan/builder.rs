@@ -2,10 +2,10 @@
 //!
 //! Provides a fluent API for configuring and executing AOB scans.
 
-use windows::Win32::Foundation::HANDLE;
 use crate::memory::MemoryError;
 use crate::memory_aobscan::pattern::Pattern;
 use crate::memory_aobscan::scanner::aob_scan_internal;
+use windows::Win32::Foundation::HANDLE;
 
 /// Builder for configuring AOB scans.
 ///
@@ -31,7 +31,7 @@ pub struct AobScanBuilder {
     start_address: usize,
     length: usize,
     find_all: bool,
-    use_cache: bool,  // Whether to use cached memory regions
+    use_cache: bool, // Whether to use cached memory regions
 }
 
 impl AobScanBuilder {
@@ -46,7 +46,7 @@ impl AobScanBuilder {
             start_address: 0,
             length: 0, // 0 means scan all available memory
             find_all: false,
-            use_cache: true,  // Enable caching by default for better performance
+            use_cache: true, // Enable caching by default for better performance
         }
     }
 
@@ -104,16 +104,16 @@ impl AobScanBuilder {
     /// * `bytes` - Raw byte vector (all bytes must match, no wildcards)
     pub fn pattern_bytes(mut self, bytes: Vec<u8>) -> Self {
         use crate::memory_aobscan::pattern::anchor::find_best_anchor_sequence;
-        
+
         let mask = vec![true; bytes.len()];
         let mask_bytes = vec![0xFF; bytes.len()];
-        
+
         // Find best multi-byte anchor sequence for this pattern
         let anchor_sequence = find_best_anchor_sequence(&bytes, &mask);
-        
-        self.pattern = Some(Pattern { 
-            bytes, 
-            mask, 
+
+        self.pattern = Some(Pattern {
+            bytes,
+            mask,
             mask_bytes,
             anchor_sequence,
         });
@@ -165,17 +165,17 @@ impl AobScanBuilder {
     /// # }
     /// ```
     pub fn scan(self) -> Result<Vec<usize>, MemoryError> {
-        let pattern = self.pattern.ok_or_else(|| {
-            MemoryError::InvalidAddress("Pattern not set".to_string())
-        })?;
-        
+        let pattern = self
+            .pattern
+            .ok_or_else(|| MemoryError::InvalidAddress("Pattern not set".to_string()))?;
+
         aob_scan_internal(
-            self.handle, 
-            &pattern, 
-            self.start_address, 
-            self.length, 
+            self.handle,
+            &pattern,
+            self.start_address,
+            self.length,
             self.find_all,
-            self.use_cache
+            self.use_cache,
         )
     }
 }

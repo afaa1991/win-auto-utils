@@ -66,6 +66,4 @@
 
 mod memory_lock;
 
-pub use memory_lock::{MemoryLock, AsBytes};
-// Re-export AddressSource from memory_resolver for convenience
-pub use crate::memory_resolver::AddressSource;
+pub use memory_lock::{AsBytes, MemoryLock};

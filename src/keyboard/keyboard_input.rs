@@ -186,7 +186,11 @@ impl SendInputKeyboard {
     }
 
     /// Release a key by VK code
-    pub fn release_with_vk(&self, vk_code: u8, extended: bool) -> Result<(), SendKeyBoardInputError> {
+    pub fn release_with_vk(
+        &self,
+        vk_code: u8,
+        extended: bool,
+    ) -> Result<(), SendKeyBoardInputError> {
         let input = build_key_up_input(vk_code, extended);
         execute_single_input(&input)
     }

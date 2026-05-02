@@ -141,11 +141,11 @@
 //!
 
 // Submodules - each instruction handler in its own file
-pub mod loop_cmd;
 pub mod break_cmd;
 pub mod continue_cmd;
+pub mod loop_cmd;
 
 // Re-export handlers for convenience
-pub use loop_cmd::{LoopHandler, init_loop_terminator};
 pub use break_cmd::BreakHandler;
 pub use continue_cmd::ContinueHandler;
+pub use loop_cmd::{init_loop_terminator, LoopHandler};

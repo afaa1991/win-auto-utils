@@ -5,22 +5,24 @@
 
 #![cfg(windows)]
 
-use std::sync::{Mutex, OnceLock};
 use std::mem;
+use std::sync::{Mutex, OnceLock};
 
 use windows::{
     core::Interface,
-    Win32::Graphics::Direct3D::{D3D_DRIVER_TYPE_UNKNOWN, D3D_FEATURE_LEVEL, D3D_FEATURE_LEVEL_9_1},
+    Win32::Graphics::Direct3D::{
+        D3D_DRIVER_TYPE_UNKNOWN, D3D_FEATURE_LEVEL, D3D_FEATURE_LEVEL_9_1,
+    },
     Win32::Graphics::Direct3D11::{
+        D3D11CreateDevice, ID3D11Device, ID3D11DeviceContext, ID3D11Texture2D,
         D3D11_CPU_ACCESS_READ, D3D11_CREATE_DEVICE_BGRA_SUPPORT, D3D11_SDK_VERSION,
-        D3D11_TEXTURE2D_DESC, D3D11_USAGE_STAGING, D3D11CreateDevice, ID3D11Device,
-        ID3D11DeviceContext, ID3D11Texture2D,
+        D3D11_TEXTURE2D_DESC, D3D11_USAGE_STAGING,
     },
     Win32::Graphics::Dxgi::{
-        CreateDXGIFactory1, DXGI_ERROR_ACCESS_DENIED, DXGI_ERROR_ACCESS_LOST,
-        DXGI_ERROR_NOT_FOUND, DXGI_ERROR_WAIT_TIMEOUT, DXGI_MAP_READ, DXGI_MAPPED_RECT,
-        DXGI_OUTPUT_DESC, IDXGIAdapter1, IDXGIFactory1, IDXGIOutput, 
-        IDXGIOutput1, IDXGIOutputDuplication, IDXGIResource, IDXGISurface1,
+        CreateDXGIFactory1, IDXGIAdapter1, IDXGIFactory1, IDXGIOutput, IDXGIOutput1,
+        IDXGIOutputDuplication, IDXGIResource, IDXGISurface1, DXGI_ERROR_ACCESS_DENIED,
+        DXGI_ERROR_ACCESS_LOST, DXGI_ERROR_NOT_FOUND, DXGI_ERROR_WAIT_TIMEOUT, DXGI_MAPPED_RECT,
+        DXGI_MAP_READ, DXGI_OUTPUT_DESC,
     },
 };
 
@@ -76,7 +78,7 @@ impl DxgiManager {
 
         let mut adapter_opt: Option<IDXGIAdapter1> = None;
         let mut output_opt: Option<IDXGIOutput1> = None;
-        
+
         for i in 0.. {
             let adapter: IDXGIAdapter1 = match unsafe { factory.EnumAdapters1(i) } {
                 Ok(a) => a,
@@ -124,7 +126,7 @@ impl DxgiManager {
         let (device, device_context) = unsafe {
             let mut dev: Option<ID3D11Device> = None;
             let mut ctx: Option<ID3D11DeviceContext> = None;
-            
+
             D3D11CreateDevice(
                 Some(&adapter.cast().unwrap()),
                 D3D_DRIVER_TYPE_UNKNOWN,
@@ -135,29 +137,38 @@ impl DxgiManager {
                 Some(&mut dev),
                 None,
                 Some(&mut ctx),
-            ).map_err(|e| DxgiError::InitializationFailed(format!("Create device: {}", e)))?;
-            
+            )
+            .map_err(|e| DxgiError::InitializationFailed(format!("Create device: {}", e)))?;
+
             (dev.unwrap(), ctx.unwrap())
         };
 
         let output_duplication = unsafe { output.DuplicateOutput(&device) }
             .map_err(|e| DxgiError::InitializationFailed(format!("Duplicate output: {}", e)))?;
 
-        Ok(Self { device, device_context, output_duplication, width, height })
+        Ok(Self {
+            device,
+            device_context,
+            output_duplication,
+            width,
+            height,
+        })
     }
 
     fn capture_region(&mut self, x: i32, y: i32, w: i32, h: i32) -> Result<Vec<u8>, DxgiError> {
         let mut frame_info = unsafe { mem::zeroed() };
         let mut resource: Option<IDXGIResource> = None;
-        
+
         unsafe {
             self.output_duplication
                 .AcquireNextFrame(100, &mut frame_info, &mut resource)
                 .map_err(map_error)?;
         }
 
-        let resource = resource.ok_or_else(|| DxgiError::CaptureFailed("No resource".to_string()))?;
-        let texture: ID3D11Texture2D = resource.cast()
+        let resource =
+            resource.ok_or_else(|| DxgiError::CaptureFailed("No resource".to_string()))?;
+        let texture: ID3D11Texture2D = resource
+            .cast()
             .map_err(|e| DxgiError::CaptureFailed(format!("Cast texture: {}", e)))?;
 
         let mut desc = D3D11_TEXTURE2D_DESC::default();
@@ -169,23 +180,27 @@ impl DxgiManager {
 
         let mut staged: Option<ID3D11Texture2D> = None;
         unsafe {
-            self.device.CreateTexture2D(&desc, None, Some(&mut staged))
+            self.device
+                .CreateTexture2D(&desc, None, Some(&mut staged))
                 .map_err(|e| DxgiError::CaptureFailed(format!("Create staging: {}", e)))?;
         }
         let staged = staged.unwrap();
         unsafe { self.device_context.CopyResource(&staged, &texture) };
 
-        unsafe { 
-            self.output_duplication.ReleaseFrame()
+        unsafe {
+            self.output_duplication
+                .ReleaseFrame()
                 .map_err(|e| DxgiError::CaptureFailed(format!("Release: {}", e)))?;
         };
 
-        let surface: IDXGISurface1 = staged.cast()
+        let surface: IDXGISurface1 = staged
+            .cast()
             .map_err(|e| DxgiError::CaptureFailed(format!("Cast surface: {}", e)))?;
 
         let mut rect = DXGI_MAPPED_RECT::default();
-        unsafe { 
-            surface.Map(&mut rect, DXGI_MAP_READ)
+        unsafe {
+            surface
+                .Map(&mut rect, DXGI_MAP_READ)
                 .map_err(|e| DxgiError::CaptureFailed(format!("Map: {}", e)))?;
         };
 
@@ -207,8 +222,10 @@ impl DxgiManager {
             }
         }
 
-        unsafe { 
-            surface.Unmap().map_err(|e| DxgiError::CaptureFailed(format!("Unmap: {}", e)))?;
+        unsafe {
+            surface
+                .Unmap()
+                .map_err(|e| DxgiError::CaptureFailed(format!("Unmap: {}", e)))?;
         };
 
         Ok(data)
@@ -222,13 +239,11 @@ impl DxgiManager {
 static MANAGER: OnceLock<Mutex<Option<DxgiManager>>> = OnceLock::new();
 
 fn get_manager() -> Result<&'static Mutex<Option<DxgiManager>>, DxgiError> {
-    Ok(MANAGER.get_or_init(|| {
-        match DxgiManager::new() {
-            Ok(m) => Mutex::new(Some(m)),
-            Err(e) => {
-                eprintln!("DXGI init failed: {}", e);
-                Mutex::new(None)
-            }
+    Ok(MANAGER.get_or_init(|| match DxgiManager::new() {
+        Ok(m) => Mutex::new(Some(m)),
+        Err(e) => {
+            eprintln!("DXGI init failed: {}", e);
+            Mutex::new(None)
         }
     }))
 }
@@ -240,7 +255,8 @@ pub fn capture_region_bytes(x: i32, y: i32, width: i32, height: i32) -> Result<V
 
     let manager = get_manager()?;
     let mut guard = manager.lock().map_err(|_| DxgiError::LockFailed)?;
-    let mgr = guard.as_mut()
+    let mgr = guard
+        .as_mut()
         .ok_or_else(|| DxgiError::InitializationFailed("Not initialized".to_string()))?;
 
     let (sw, sh) = mgr.geometry();
@@ -254,12 +270,13 @@ pub fn capture_region_bytes(x: i32, y: i32, width: i32, height: i32) -> Result<V
 pub fn capture_full_screen() -> Result<(Vec<u8>, (usize, usize)), DxgiError> {
     let manager = get_manager()?;
     let mut guard = manager.lock().map_err(|_| DxgiError::LockFailed)?;
-    let mgr = guard.as_mut()
+    let mgr = guard
+        .as_mut()
         .ok_or_else(|| DxgiError::InitializationFailed("Not initialized".to_string()))?;
 
     let (width, height) = mgr.geometry();
     let data = mgr.capture_region(0, 0, width as i32, height as i32)?;
-    
+
     Ok((data, (width, height)))
 }
 
@@ -267,7 +284,8 @@ pub fn capture_full_screen() -> Result<(Vec<u8>, (usize, usize)), DxgiError> {
 pub fn get_screen_size() -> Result<(usize, usize), DxgiError> {
     let manager = get_manager()?;
     let guard = manager.lock().map_err(|_| DxgiError::LockFailed)?;
-    let mgr = guard.as_ref()
+    let mgr = guard
+        .as_ref()
         .ok_or_else(|| DxgiError::InitializationFailed("Not initialized".to_string()))?;
     Ok(mgr.geometry())
 }
@@ -278,7 +296,9 @@ mod tests {
 
     #[test]
     fn test_error_display() {
-        assert!(DxgiError::CaptureFailed("test".to_string()).to_string().contains("test"));
+        assert!(DxgiError::CaptureFailed("test".to_string())
+            .to_string()
+            .contains("test"));
         assert!(DxgiError::RegionOutOfBounds.to_string().contains("bounds"));
     }
 

@@ -43,11 +43,11 @@
 //!     Ok(())
 //! }
 //! ```
-use windows::Win32::Foundation::HANDLE;
+use super::Architecture;
 use crate::memory::{read_memory_bytes, write_memory_bytes, MemoryError};
 use crate::memory_hook::shellcode::ShellcodeBuilder;
 use crate::memory_hook::utils::{ProtectionGuard, SendableHandle};
-use super::Architecture;
+use windows::Win32::Foundation::HANDLE;
 
 /// Inline hook for redirecting function execution
 ///
@@ -239,31 +239,34 @@ impl InlineHook {
     /// Returns `MemoryError` if reading or writing fails
     pub fn install(&mut self) -> Result<(), MemoryError> {
         if self.is_installed {
-            return Err(MemoryError::WriteFailed("Hook already installed".to_string()));
+            return Err(MemoryError::WriteFailed(
+                "Hook already installed".to_string(),
+            ));
         }
-        
+
         // Determine how many bytes we need to overwrite
         let required_bytes = match self.architecture {
             Architecture::X86 => 5,  // JMP rel32
             Architecture::X64 => 14, // MOV RAX + JMP RAX (for absolute address)
         };
-        
+
         // Save original bytes
-        self.original_bytes = read_memory_bytes(self.handle.0, self.target_address, required_bytes)?;
-        
+        self.original_bytes =
+            read_memory_bytes(self.handle.0, self.target_address, required_bytes)?;
+
         // Generate shellcode for the jump
         let jump_code = self.generate_jump_code()?;
-        
+
         // Change memory protection to allow writing
         let _guard = ProtectionGuard::new(self.handle.0, self.target_address, required_bytes)?;
-        
+
         // Write the jump code
         write_memory_bytes(self.handle.0, self.target_address, &jump_code)?;
-        
+
         self.is_installed = true;
         Ok(())
     }
-    
+
     /// Uninstall the hook and restore original bytes
     ///
     /// # Errors
@@ -272,25 +275,27 @@ impl InlineHook {
         if !self.is_installed {
             return Err(MemoryError::WriteFailed("Hook not installed".to_string()));
         }
-        
+
         if self.original_bytes.is_empty() {
-            return Err(MemoryError::WriteFailed("No original bytes to restore".to_string()));
+            return Err(MemoryError::WriteFailed(
+                "No original bytes to restore".to_string(),
+            ));
         }
-        
+
         // Change memory protection to allow writing
         let _guard = ProtectionGuard::new(
-            self.handle.0, 
-            self.target_address, 
-            self.original_bytes.len()
+            self.handle.0,
+            self.target_address,
+            self.original_bytes.len(),
         )?;
-        
+
         // Restore original bytes
         write_memory_bytes(self.handle.0, self.target_address, &self.original_bytes)?;
-        
+
         self.is_installed = false;
         Ok(())
     }
-    
+
     /// Check if the hook is currently installed
     pub fn is_installed(&self) -> bool {
         self.is_installed
@@ -300,20 +305,20 @@ impl InlineHook {
     pub fn get_original_bytes(&self) -> &[u8] {
         &self.original_bytes
     }
-    
+
     /// Generate the jump code based on architecture
     fn generate_jump_code(&self) -> Result<Vec<u8>, MemoryError> {
         let mut builder = match self.architecture {
             Architecture::X86 => ShellcodeBuilder::new_x86(),
             Architecture::X64 => ShellcodeBuilder::new_x64(),
         };
-        
+
         // For x64 with large addresses, use absolute jump
         match self.architecture {
             Architecture::X86 => {
                 // Try relative jump first
                 let offset = (self.detour_address as i64) - (self.target_address as i64) - 5;
-                
+
                 if offset >= i32::MIN as i64 && offset <= i32::MAX as i64 {
                     // Use relative jump
                     builder.jmp_relative(self.target_address, self.detour_address);
@@ -327,7 +332,7 @@ impl InlineHook {
                 builder.jmp_absolute(self.detour_address);
             }
         }
-        
+
         Ok(builder.build())
     }
 }
@@ -405,19 +410,21 @@ impl InlineHookBuilder {
     pub fn build(self) -> Result<InlineHook, MemoryError> {
         let handle = self.handle.ok_or_else(|| {
             MemoryError::WriteFailed(
-                "handle must be set. Call .handle(handle) before build().".to_string()
+                "handle must be set. Call .handle(handle) before build().".to_string(),
             )
         })?;
 
         let target_address = self.target_address.ok_or_else(|| {
             MemoryError::WriteFailed(
-                "target_address must be set. Call .target_address(addr) before build().".to_string()
+                "target_address must be set. Call .target_address(addr) before build()."
+                    .to_string(),
             )
         })?;
 
         let detour_address = self.detour_address.ok_or_else(|| {
             MemoryError::WriteFailed(
-                "detour_address must be set. Call .detour_address(addr) before build().".to_string()
+                "detour_address must be set. Call .detour_address(addr) before build()."
+                    .to_string(),
             )
         })?;
 
@@ -439,11 +446,11 @@ mod tests {
     #[test]
     fn test_inline_hook_creation() {
         let hook = InlineHook::new_x64(HANDLE::default(), 0x1000, 0x2000);
-        
+
         assert!(!hook.is_installed());
         assert_eq!(hook.get_original_bytes().len(), 0);
     }
-    
+
     #[test]
     fn test_builder_api() {
         let result = InlineHook::builder()
@@ -452,7 +459,7 @@ mod tests {
             .detour_address(0x2000)
             .x86()
             .build();
-        
+
         assert!(result.is_ok());
         let hook = result.unwrap();
         assert_eq!(hook.architecture, Architecture::X86);

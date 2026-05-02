@@ -61,7 +61,10 @@ use windows::{
         System::{
             Diagnostics::Debug::{ReadProcessMemory, WriteProcessMemory},
             LibraryLoader::{GetModuleHandleA, GetProcAddress},
-            Memory::{VirtualAllocEx, VirtualFreeEx, MEM_COMMIT, MEM_RELEASE, PAGE_EXECUTE_READWRITE, PAGE_READWRITE},
+            Memory::{
+                VirtualAllocEx, VirtualFreeEx, MEM_COMMIT, MEM_RELEASE, PAGE_EXECUTE_READWRITE,
+                PAGE_READWRITE,
+            },
             Threading::{CreateRemoteThread, GetExitCodeThread, WaitForSingleObject},
         },
     },
@@ -115,20 +118,27 @@ pub fn get_exported_function_address(
         let h_kernel32 = GetModuleHandleA(PCSTR::from_raw("kernel32.dll\0".as_ptr()))
             .map_err(|e| DllInjectorError::GetProcAddressFailed(e.to_string()))?;
 
-        let get_proc_address_fn = match GetProcAddress(h_kernel32, PCSTR::from_raw("GetProcAddress\0".as_ptr())) {
-            Some(addr) => addr,
-            None => {
-                let _ = CloseHandle(handle);
-                return Err(DllInjectorError::GetProcAddressFailed(
-                    "GetProcAddress not found".to_string()
-                ));
-            }
-        };
+        let get_proc_address_fn =
+            match GetProcAddress(h_kernel32, PCSTR::from_raw("GetProcAddress\0".as_ptr())) {
+                Some(addr) => addr,
+                None => {
+                    let _ = CloseHandle(handle);
+                    return Err(DllInjectorError::GetProcAddressFailed(
+                        "GetProcAddress not found".to_string(),
+                    ));
+                }
+            };
 
         // Allocate memory for function name
         let func_name_cstr = format!("{}\0", function_name);
         let func_name_bytes = func_name_cstr.as_bytes();
-        let func_name_addr = VirtualAllocEx(handle, None, func_name_bytes.len(), MEM_COMMIT, PAGE_READWRITE);
+        let func_name_addr = VirtualAllocEx(
+            handle,
+            None,
+            func_name_bytes.len(),
+            MEM_COMMIT,
+            PAGE_READWRITE,
+        );
 
         if func_name_addr.is_null() {
             let _ = CloseHandle(handle);
@@ -136,10 +146,20 @@ pub fn get_exported_function_address(
         }
 
         let mut bytes_written = 0;
-        if WriteProcessMemory(handle, func_name_addr, func_name_bytes.as_ptr() as *const c_void, func_name_bytes.len(), Some(&mut bytes_written)).is_err() {
+        if WriteProcessMemory(
+            handle,
+            func_name_addr,
+            func_name_bytes.as_ptr() as *const c_void,
+            func_name_bytes.len(),
+            Some(&mut bytes_written),
+        )
+        .is_err()
+        {
             let _ = VirtualFreeEx(handle, func_name_addr, 0, MEM_RELEASE);
             let _ = CloseHandle(handle);
-            return Err(DllInjectorError::WriteFailed("Failed to write function name".to_string()));
+            return Err(DllInjectorError::WriteFailed(
+                "Failed to write function name".to_string(),
+            ));
         }
 
         // Allocate memory for result
@@ -170,7 +190,13 @@ pub fn get_exported_function_address(
         );
 
         // Allocate and write shellcode
-        let shellcode_addr = VirtualAllocEx(handle, None, shellcode.len(), MEM_COMMIT, PAGE_EXECUTE_READWRITE);
+        let shellcode_addr = VirtualAllocEx(
+            handle,
+            None,
+            shellcode.len(),
+            MEM_COMMIT,
+            PAGE_EXECUTE_READWRITE,
+        );
         if shellcode_addr.is_null() {
             let _ = VirtualFreeEx(handle, result_addr, 0, MEM_RELEASE);
             let _ = VirtualFreeEx(handle, func_name_addr, 0, MEM_RELEASE);
@@ -179,16 +205,34 @@ pub fn get_exported_function_address(
         }
 
         let mut bytes_written = 0;
-        if WriteProcessMemory(handle, shellcode_addr, shellcode.as_ptr() as *const c_void, shellcode.len(), Some(&mut bytes_written)).is_err() {
+        if WriteProcessMemory(
+            handle,
+            shellcode_addr,
+            shellcode.as_ptr() as *const c_void,
+            shellcode.len(),
+            Some(&mut bytes_written),
+        )
+        .is_err()
+        {
             let _ = VirtualFreeEx(handle, shellcode_addr, 0, MEM_RELEASE);
             let _ = VirtualFreeEx(handle, result_addr, 0, MEM_RELEASE);
             let _ = VirtualFreeEx(handle, func_name_addr, 0, MEM_RELEASE);
             let _ = CloseHandle(handle);
-            return Err(DllInjectorError::WriteFailed("Failed to write shellcode".to_string()));
+            return Err(DllInjectorError::WriteFailed(
+                "Failed to write shellcode".to_string(),
+            ));
         }
 
         // Execute shellcode
-        let thread_result = CreateRemoteThread(handle, None, 0, Some(std::mem::transmute(shellcode_addr)), None, 0, None);
+        let thread_result = CreateRemoteThread(
+            handle,
+            None,
+            0,
+            Some(std::mem::transmute(shellcode_addr)),
+            None,
+            0,
+            None,
+        );
 
         match thread_result {
             Ok(thread) => {
@@ -218,7 +262,8 @@ pub fn get_exported_function_address(
 
                 if func_address == 0 {
                     return Err(DllInjectorError::GetProcAddressFailed(format!(
-                        "Function '{}' not found in '{}'", function_name, module_name
+                        "Function '{}' not found in '{}'",
+                        function_name, module_name
                     )));
                 }
 
@@ -322,7 +367,8 @@ pub fn call_function_with_raw_bytes(
         // Allocate memory for parameter if provided
         let param_addr = if let Some(data) = param_data {
             let param_size = data.len();
-            let param_addr_raw = VirtualAllocEx(handle, None, param_size, MEM_COMMIT, PAGE_READWRITE);
+            let param_addr_raw =
+                VirtualAllocEx(handle, None, param_size, MEM_COMMIT, PAGE_READWRITE);
 
             if param_addr_raw.is_null() {
                 let _ = CloseHandle(handle);
@@ -330,10 +376,20 @@ pub fn call_function_with_raw_bytes(
             }
 
             let mut bytes_written = 0;
-            if WriteProcessMemory(handle, param_addr_raw, data.as_ptr() as *const c_void, param_size, Some(&mut bytes_written)).is_err() {
+            if WriteProcessMemory(
+                handle,
+                param_addr_raw,
+                data.as_ptr() as *const c_void,
+                param_size,
+                Some(&mut bytes_written),
+            )
+            .is_err()
+            {
                 let _ = VirtualFreeEx(handle, param_addr_raw, 0, MEM_RELEASE);
                 let _ = CloseHandle(handle);
-                return Err(DllInjectorError::WriteFailed("Failed to write parameter".to_string()));
+                return Err(DllInjectorError::WriteFailed(
+                    "Failed to write parameter".to_string(),
+                ));
             }
 
             Some((param_addr_raw as usize, param_size))
@@ -360,7 +416,13 @@ pub fn call_function_with_raw_bytes(
         );
 
         // Allocate and write shellcode
-        let shellcode_addr = VirtualAllocEx(handle, None, shellcode.len(), MEM_COMMIT, PAGE_EXECUTE_READWRITE);
+        let shellcode_addr = VirtualAllocEx(
+            handle,
+            None,
+            shellcode.len(),
+            MEM_COMMIT,
+            PAGE_EXECUTE_READWRITE,
+        );
         if shellcode_addr.is_null() {
             if let Some((addr, _)) = param_addr {
                 let _ = VirtualFreeEx(handle, addr as *mut c_void, 0, MEM_RELEASE);
@@ -370,17 +432,35 @@ pub fn call_function_with_raw_bytes(
         }
 
         let mut bytes_written = 0;
-        if WriteProcessMemory(handle, shellcode_addr, shellcode.as_ptr() as *const c_void, shellcode.len(), Some(&mut bytes_written)).is_err() {
+        if WriteProcessMemory(
+            handle,
+            shellcode_addr,
+            shellcode.as_ptr() as *const c_void,
+            shellcode.len(),
+            Some(&mut bytes_written),
+        )
+        .is_err()
+        {
             let _ = VirtualFreeEx(handle, shellcode_addr, 0, MEM_RELEASE);
             if let Some((addr, _)) = param_addr {
                 let _ = VirtualFreeEx(handle, addr as *mut c_void, 0, MEM_RELEASE);
             }
             let _ = CloseHandle(handle);
-            return Err(DllInjectorError::WriteFailed("Failed to write shellcode".to_string()));
+            return Err(DllInjectorError::WriteFailed(
+                "Failed to write shellcode".to_string(),
+            ));
         }
 
         // Execute
-        let thread_result = CreateRemoteThread(handle, None, 0, Some(std::mem::transmute(shellcode_addr)), None, 0, None);
+        let thread_result = CreateRemoteThread(
+            handle,
+            None,
+            0,
+            Some(std::mem::transmute(shellcode_addr)),
+            None,
+            0,
+            None,
+        );
 
         match thread_result {
             Ok(thread) => {
@@ -448,36 +528,61 @@ pub fn call_function_with_raw_bytes(
 /// - Cleaner intent (explicitly shows no parameters)
 ///
 /// Typical execution time: 3-15ms per call
-pub fn call_function_no_params(
-    pid: u32,
-    function_address: usize,
-) -> Result<u32, DllInjectorError> {
+pub fn call_function_no_params(pid: u32, function_address: usize) -> Result<u32, DllInjectorError> {
     unsafe {
         let handle = open_process_full(pid)?;
 
         // Generate optimized shellcode
         #[cfg(target_arch = "x86_64")]
-        let shellcode = shellcode::call_function::generate_call_function_no_params_shellcode_x64(function_address);
+        let shellcode = shellcode::call_function::generate_call_function_no_params_shellcode_x64(
+            function_address,
+        );
 
         #[cfg(target_arch = "x86")]
-        let shellcode = shellcode::call_function::generate_call_function_no_params_shellcode_x86(function_address);
+        let shellcode = shellcode::call_function::generate_call_function_no_params_shellcode_x86(
+            function_address,
+        );
 
         // Allocate and write shellcode
-        let shellcode_addr = VirtualAllocEx(handle, None, shellcode.len(), MEM_COMMIT, PAGE_EXECUTE_READWRITE);
+        let shellcode_addr = VirtualAllocEx(
+            handle,
+            None,
+            shellcode.len(),
+            MEM_COMMIT,
+            PAGE_EXECUTE_READWRITE,
+        );
         if shellcode_addr.is_null() {
             let _ = CloseHandle(handle);
             return Err(DllInjectorError::AllocationFailed);
         }
 
         let mut bytes_written = 0;
-        if WriteProcessMemory(handle, shellcode_addr, shellcode.as_ptr() as *const c_void, shellcode.len(), Some(&mut bytes_written)).is_err() {
+        if WriteProcessMemory(
+            handle,
+            shellcode_addr,
+            shellcode.as_ptr() as *const c_void,
+            shellcode.len(),
+            Some(&mut bytes_written),
+        )
+        .is_err()
+        {
             let _ = VirtualFreeEx(handle, shellcode_addr, 0, MEM_RELEASE);
             let _ = CloseHandle(handle);
-            return Err(DllInjectorError::WriteFailed("Failed to write shellcode".to_string()));
+            return Err(DllInjectorError::WriteFailed(
+                "Failed to write shellcode".to_string(),
+            ));
         }
 
         // Execute
-        let thread_result = CreateRemoteThread(handle, None, 0, Some(std::mem::transmute(shellcode_addr)), None, 0, None);
+        let thread_result = CreateRemoteThread(
+            handle,
+            None,
+            0,
+            Some(std::mem::transmute(shellcode_addr)),
+            None,
+            0,
+            None,
+        );
 
         match thread_result {
             Ok(thread) => {

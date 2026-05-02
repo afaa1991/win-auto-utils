@@ -132,17 +132,19 @@
 //! Enable with: `--features "dll_injector"`
 
 // Module declarations
-mod helpers;
 mod core;
-mod remote_call;
 mod diagnostic;
+mod helpers;
+mod remote_call;
 mod shellcode;
 
 // Re-export public API
 pub use core::{inject_dll, unload_dll};
-use std::fmt;
-pub use remote_call::{get_exported_function_address, call_function_with_raw_bytes, call_function_no_params};
 pub use diagnostic::diagnose_injection;
+pub use remote_call::{
+    call_function_no_params, call_function_with_raw_bytes, get_exported_function_address,
+};
+use std::fmt;
 
 /// DLL injection error types
 #[derive(Debug)]
@@ -169,11 +171,21 @@ impl fmt::Display for DllInjectorError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             DllInjectorError::OpenProcessFailed(msg) => write!(f, "Open process failed: {}", msg),
-            DllInjectorError::AllocationFailed => write!(f, "Failed to allocate memory in target process"),
-            DllInjectorError::WriteFailed(msg) => write!(f, "Failed to write to target process: {}", msg),
-            DllInjectorError::GetProcAddressFailed(msg) => write!(f, "Get procedure address failed: {}", msg),
-            DllInjectorError::CreateThreadFailed(msg) => write!(f, "Create remote thread failed: {}", msg),
-            DllInjectorError::ArchitectureMismatch(msg) => write!(f, "Architecture mismatch: {}", msg),
+            DllInjectorError::AllocationFailed => {
+                write!(f, "Failed to allocate memory in target process")
+            }
+            DllInjectorError::WriteFailed(msg) => {
+                write!(f, "Failed to write to target process: {}", msg)
+            }
+            DllInjectorError::GetProcAddressFailed(msg) => {
+                write!(f, "Get procedure address failed: {}", msg)
+            }
+            DllInjectorError::CreateThreadFailed(msg) => {
+                write!(f, "Create remote thread failed: {}", msg)
+            }
+            DllInjectorError::ArchitectureMismatch(msg) => {
+                write!(f, "Architecture mismatch: {}", msg)
+            }
             DllInjectorError::AlreadyLoaded(msg) => write!(f, "DLL already loaded: {}", msg),
             DllInjectorError::Other(msg) => write!(f, "{}", msg),
         }

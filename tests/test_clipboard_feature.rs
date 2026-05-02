@@ -1,7 +1,7 @@
 //! Clipboard feature integration test
 //!
 //! This test verifies the clipboard module functionality.
-//! 
+//!
 //! Run with: `cargo test --test test_clipboard_feature --features "clipboard" -- --nocapture`
 
 #[cfg(feature = "clipboard")]
@@ -59,14 +59,14 @@ fn test_clipboard_has_text() {
 
     // Set some text
     clipboard::set_text("Test").ok();
-    
+
     // Check if has_text returns true
     assert!(clipboard::has_text());
     println!("✓ has_text() returns true when clipboard has content\n");
 
     // Clear clipboard
     clipboard::clear().ok();
-    
+
     // Note: has_text might still return true if other processes set clipboard
     println!("Note: After clearing, has_text() depends on system state\n");
 

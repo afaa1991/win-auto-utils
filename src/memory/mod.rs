@@ -126,14 +126,20 @@ impl std::error::Error for MemoryError {}
 ///     Ok(())
 /// }
 /// ```
-pub fn read_memory_bytes(handle: HANDLE, address: usize, size: usize) -> Result<Vec<u8>, MemoryError> {
+pub fn read_memory_bytes(
+    handle: HANDLE,
+    address: usize,
+    size: usize,
+) -> Result<Vec<u8>, MemoryError> {
     if address == 0 {
-        return Err(MemoryError::InvalidAddress("Address cannot be zero".to_string()));
+        return Err(MemoryError::InvalidAddress(
+            "Address cannot be zero".to_string(),
+        ));
     }
-    
+
     let mut buffer = vec![0u8; size];
     let mut bytes_read = 0usize;
-    
+
     unsafe {
         match ReadProcessMemory(
             handle,
@@ -190,11 +196,13 @@ pub fn read_memory_bytes(handle: HANDLE, address: usize, size: usize) -> Result<
 /// ```
 pub fn write_memory_bytes(handle: HANDLE, address: usize, data: &[u8]) -> Result<(), MemoryError> {
     if address == 0 {
-        return Err(MemoryError::InvalidAddress("Address cannot be zero".to_string()));
+        return Err(MemoryError::InvalidAddress(
+            "Address cannot be zero".to_string(),
+        ));
     }
-    
+
     let mut bytes_written = 0usize;
-    
+
     unsafe {
         match WriteProcessMemory(
             handle,
@@ -206,11 +214,14 @@ pub fn write_memory_bytes(handle: HANDLE, address: usize, data: &[u8]) -> Result
             Ok(_) if bytes_written == data.len() => Ok(()),
             Ok(_) => Err(MemoryError::WriteFailed(format!(
                 "Incomplete write: expected {} bytes, wrote {}",
-                data.len(), bytes_written
+                data.len(),
+                bytes_written
             ))),
             Err(e) => Err(MemoryError::WriteFailed(format!(
                 "Failed to write {} bytes to address 0x{:X}. Windows error: {:?}",
-                data.len(), address, e
+                data.len(),
+                address,
+                e
             ))),
         }
     }
@@ -260,7 +271,7 @@ pub fn write_memory_bytes(handle: HANDLE, address: usize, data: &[u8]) -> Result
 pub fn read_memory_t<T: Copy + Sized>(handle: HANDLE, address: usize) -> Result<T, MemoryError> {
     let size = std::mem::size_of::<T>();
     let bytes = read_memory_bytes(handle, address, size)?;
-    
+
     // Convert bytes back to T
     unsafe {
         let ptr = bytes.as_ptr() as *const T;
@@ -309,12 +320,14 @@ pub fn read_memory_t<T: Copy + Sized>(handle: HANDLE, address: usize) -> Result<
 ///     Ok(())
 /// }
 /// ```
-pub fn write_memory_t<T: Copy + Sized>(handle: HANDLE, address: usize, value: T) -> Result<(), MemoryError> {
+pub fn write_memory_t<T: Copy + Sized>(
+    handle: HANDLE,
+    address: usize,
+    value: T,
+) -> Result<(), MemoryError> {
     let size = std::mem::size_of::<T>();
-    let bytes = unsafe {
-        std::slice::from_raw_parts(&value as *const T as *const u8, size)
-    };
-    
+    let bytes = unsafe { std::slice::from_raw_parts(&value as *const T as *const u8, size) };
+
     write_memory_bytes(handle, address, bytes)
 }
 
@@ -431,7 +444,7 @@ mod tests {
         let result = read_memory_bytes(handle, 0, 10);
         assert!(result.is_err());
         match result {
-            Err(MemoryError::InvalidAddress(_)) => {},
+            Err(MemoryError::InvalidAddress(_)) => {}
             _ => panic!("Expected InvalidAddress error"),
         }
     }
@@ -443,7 +456,7 @@ mod tests {
         let result = write_memory_bytes(handle, 0, &data);
         assert!(result.is_err());
         match result {
-            Err(MemoryError::InvalidAddress(_)) => {},
+            Err(MemoryError::InvalidAddress(_)) => {}
             _ => panic!("Expected InvalidAddress error"),
         }
     }
@@ -466,7 +479,7 @@ mod tests {
     fn test_read_memory_t_type_safety() {
         // Test that read_memory_t works with different types
         let handle = HANDLE(std::ptr::null_mut());
-        
+
         // These should all compile and return errors (due to null handle)
         let _: Result<u8, _> = read_memory_t(handle, 0x1000);
         let _: Result<i32, _> = read_memory_t(handle, 0x1000);

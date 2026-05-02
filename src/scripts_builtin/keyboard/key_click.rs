@@ -104,20 +104,27 @@ impl InstructionHandler for KeyClickHandler {
                     // params.send_inputs contains [down_input, up_input] (pre-built at parse time)
                     if params.send_inputs.len() >= 2 {
                         // Execute KEYDOWN (first input)
-                        keyboard_input::execute_single_input(&params.send_inputs[0]).map_err(|e| {
-                            ScriptError::ExecutionError(format!("SendInput press failed: {:?}", e))
-                        })?;
+                        keyboard_input::execute_single_input(&params.send_inputs[0]).map_err(
+                            |e| {
+                                ScriptError::ExecutionError(format!(
+                                    "SendInput press failed: {:?}",
+                                    e
+                                ))
+                            },
+                        )?;
 
                         // Apply delay using optimized utility function
                         sleep_ms(params.delay_ms);
 
                         // Execute KEYUP (second input)
-                        keyboard_input::execute_single_input(&params.send_inputs[1]).map_err(|e| {
-                            ScriptError::ExecutionError(format!(
-                                "SendInput release failed: {:?}",
-                                e
-                            ))
-                        })?;
+                        keyboard_input::execute_single_input(&params.send_inputs[1]).map_err(
+                            |e| {
+                                ScriptError::ExecutionError(format!(
+                                    "SendInput release failed: {:?}",
+                                    e
+                                ))
+                            },
+                        )?;
                     } else {
                         return Err(ScriptError::ExecutionError(
                             "Invalid pre-built inputs: expected 2 inputs for delayed click".into(),
@@ -138,16 +145,28 @@ impl InstructionHandler for KeyClickHandler {
 
                     if params.delay_ms > 0 {
                         // Execute KEYDOWN
-                        keyboard_message::post_key_down_atomic(hwnd, params.vk_code, params.scan_code);
+                        keyboard_message::post_key_down_atomic(
+                            hwnd,
+                            params.vk_code,
+                            params.scan_code,
+                        );
 
                         // Apply delay using optimized utility function
                         sleep_ms(params.delay_ms);
 
                         // Execute KEYUP
-                        keyboard_message::post_key_up_atomic(hwnd, params.vk_code, params.scan_code);
+                        keyboard_message::post_key_up_atomic(
+                            hwnd,
+                            params.vk_code,
+                            params.scan_code,
+                        );
                     } else {
                         // No delay - atomic click
-                        keyboard_message::post_key_click_atomic(hwnd, params.vk_code, params.scan_code);
+                        keyboard_message::post_key_click_atomic(
+                            hwnd,
+                            params.vk_code,
+                            params.scan_code,
+                        );
                     }
                 }
 
@@ -156,7 +175,8 @@ impl InstructionHandler for KeyClickHandler {
                     return Err(ScriptError::ExecutionError(
                         "PostMessage mode requires 'script_process_context' feature. \
                          Enable it in Cargo.toml: features = [\"scripts_keyboard_with_post\"] \
-                         or use SendInput mode (default).".into()
+                         or use SendInput mode (default)."
+                            .into(),
                     ));
                 }
             }

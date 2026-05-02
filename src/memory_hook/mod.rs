@@ -135,20 +135,20 @@
 //! }
 //! ```
 
-mod inline_hook;
-mod trampoline_hook;
 mod bytes_switch;
+mod inline_hook;
 mod shellcode;
+mod trampoline_hook;
 mod utils;
 
 #[cfg(feature = "memory_register_extractor")]
 pub mod register_extractor;
 
-pub use inline_hook::InlineHook;
-pub use trampoline_hook::TrampolineHook;
 pub use bytes_switch::BytesSwitch;
-pub use shellcode::{ShellcodeBuilder, Architecture};
-pub use utils::{ProtectionGuard, MemoryProtector};
+pub use inline_hook::InlineHook;
+pub use shellcode::{Architecture, ShellcodeBuilder};
+pub use trampoline_hook::TrampolineHook;
+pub use utils::{MemoryProtector, ProtectionGuard};
 
 #[cfg(feature = "memory_register_extractor")]
-pub use register_extractor::{RegisterExtractor, Register};
+pub use register_extractor::{Register, RegisterExtractor};

@@ -38,8 +38,8 @@ use std::process;
 
 #[cfg(feature = "dll_injector")]
 use win_auto_utils::dll_injector::{
-    diagnose_injection, inject_dll, unload_dll,
-    get_exported_function_address, call_function_with_raw_bytes, call_function_no_params
+    call_function_no_params, call_function_with_raw_bytes, diagnose_injection,
+    get_exported_function_address, inject_dll, unload_dll,
 };
 
 #[cfg(feature = "snapshot")]
@@ -659,20 +659,20 @@ fn main() {
 
     // Success summary
     println!("\n🎉 DLL injection completed successfully!");
-    
+
     // Step 7: Optional - Call exported function
     if let Some(ref func_name) = config.function_name {
         println!("\n📞 Calling exported function '{}'...", func_name);
-        
+
         match get_exported_function_address(config.pid, &config.module_name, func_name) {
             Ok(func_addr) => {
                 println!("   ✅ Function address: 0x{:X}", func_addr);
-                
+
                 if let Some(param) = config.function_param {
                     // Call with parameter
                     println!("   📤 Passing parameter: {}", param);
                     let param_bytes = param.to_ne_bytes();
-                    
+
                     match call_function_with_raw_bytes(config.pid, func_addr, Some(&param_bytes)) {
                         Ok(result) => println!("   ✅ Function returned: {}", result),
                         Err(e) => eprintln!("   ❌ Function call failed: {}", e),
@@ -694,7 +694,7 @@ fn main() {
             }
         }
     }
-    
+
     println!("\n📝 Next steps:");
     println!("   - Observe target process for expected behavior");
     println!("   - Use Process Explorer to verify module in memory");

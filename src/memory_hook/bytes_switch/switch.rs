@@ -5,9 +5,9 @@
 //! - State management
 //! - RAII automatic restoration
 
-use windows::Win32::Foundation::HANDLE;
 use crate::memory::{read_memory_bytes, write_memory_bytes, MemoryError};
 use crate::memory_hook::utils::{ProtectionGuard, SendableHandle};
+use windows::Win32::Foundation::HANDLE;
 
 /// Bytecode Switch for quickly enabling/disabling specific machine instructions
 ///
@@ -89,11 +89,20 @@ impl BytesSwitch {
     /// let switch = BytesSwitch::new_nop(handle, 0x41FAF2, 6)?;
     /// switch.enable()?;  // Disable feature
     /// ```
-    pub fn new_nop(handle: HANDLE, target_address: usize, byte_count: usize) -> Result<Self, MemoryError> {
+    pub fn new_nop(
+        handle: HANDLE,
+        target_address: usize,
+        byte_count: usize,
+    ) -> Result<Self, MemoryError> {
         let original_bytes = read_memory_bytes(handle, target_address, byte_count)?;
         let patch_bytes = vec![0x90; byte_count]; // NOP instruction
-        
-        Ok(Self::new(handle, target_address, original_bytes, patch_bytes))
+
+        Ok(Self::new(
+            handle,
+            target_address,
+            original_bytes,
+            patch_bytes,
+        ))
     }
 
     /// Create a builder for precise configuration
@@ -116,7 +125,17 @@ impl BytesSwitch {
         crate::memory_hook::bytes_switch::builder::BytesSwitchBuilder::new()
     }
 
-    /// Enable patch (write patch bytes)
+    /// Check if the switch is currently enabled
+    pub fn is_enabled(&self) -> bool {
+        self.is_enabled
+    }
+
+    /// Get the process handle used by this switch instance
+    pub fn get_handle(&self) -> HANDLE {
+        self.handle.0
+    }
+
+    /// Enable the patch (write patch bytes to target address)
     ///
     /// # Errors
     /// If already enabled or write fails, returns `MemoryError`
@@ -128,20 +147,19 @@ impl BytesSwitch {
     /// ```
     pub fn enable(&mut self) -> Result<(), MemoryError> {
         if self.is_enabled {
-            return Err(MemoryError::WriteFailed("Patch already enabled".to_string()));
+            return Err(MemoryError::WriteFailed(
+                "Patch already enabled".to_string(),
+            ));
         }
 
         if self.original_bytes.len() != self.patch_bytes.len() {
             return Err(MemoryError::WriteFailed(
-                "Original and patch bytes length mismatch".to_string()
+                "Original and patch bytes length mismatch".to_string(),
             ));
         }
 
-        let _guard = ProtectionGuard::new(
-            self.handle.0,
-            self.target_address,
-            self.patch_bytes.len()
-        )?;
+        let _guard =
+            ProtectionGuard::new(self.handle.0, self.target_address, self.patch_bytes.len())?;
 
         write_memory_bytes(self.handle.0, self.target_address, &self.patch_bytes)?;
         self.is_enabled = true;
@@ -168,7 +186,7 @@ impl BytesSwitch {
         let _guard = ProtectionGuard::new(
             self.handle.0,
             self.target_address,
-            self.original_bytes.len()
+            self.original_bytes.len(),
         )?;
 
         write_memory_bytes(self.handle.0, self.target_address, &self.original_bytes)?;
@@ -240,11 +258,6 @@ impl BytesSwitch {
         self.original_bytes.clear();
         self.patch_bytes.clear();
         self.is_enabled = false;
-    }
-
-    /// Check if patch is enabled
-    pub fn is_enabled(&self) -> bool {
-        self.is_enabled
     }
 
     /// Get target address

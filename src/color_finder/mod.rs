@@ -43,7 +43,7 @@ use std::error::Error;
 
 // Re-export algorithms module (pure Rust, always available)
 pub mod algorithms;
-pub use algorithms::{FindResult, find_color_in_buffer};
+pub use algorithms::{find_color_in_buffer, FindResult};
 
 // dxgi feature is automatically enabled by color_finder, so we can always use it
 use crate::dxgi::capture_region_bytes;
@@ -80,7 +80,6 @@ pub fn find_color(
     h: i32,
     target: (u8, u8, u8),
 ) -> Result<FindResult, Box<dyn Error>> {
-
     // Capture region color data using DXGI (BGRA format)
     let colors = capture_region_bytes(x, y, w, h)?;
 

@@ -15,7 +15,7 @@
 //! ```
 
 use win_auto_utils::hwnd::get_hwnd_by_title;
-use win_auto_utils::script_engine::{ScriptEngine, InterruptController};
+use win_auto_utils::script_engine::{InterruptController, ScriptEngine};
 
 fn main() {
     println!("=== Active Instruction Demo ===\n");
@@ -24,7 +24,7 @@ fn main() {
     // Step 1: Create script engine with built-in instructions
     // ========================================================================
     println!("1. Setting up script engine with window activation support...");
-    
+
     let engine = ScriptEngine::with_builtin();
     println!("   ✓ Engine ready with all built-in instructions (including 'active')");
 
@@ -32,15 +32,18 @@ fn main() {
     // Step 2: Find target window
     // ========================================================================
     println!("\n2. Finding target window...");
-    
+
     let window_title = "Notepad";
     if let Some(hwnd) = get_hwnd_by_title(window_title) {
         println!("   ✓ Found {}: {:?}", window_title, hwnd);
-        
+
         // Note: The 'active' instruction will automatically retrieve HWND from VM context
         // No need to manually set it - the engine handles this internally
     } else {
-        println!("   ✗ {} not found. Please open Notepad and try again.", window_title);
+        println!(
+            "   ✗ {} not found. Please open Notepad and try again.",
+            window_title
+        );
         return;
     }
 
@@ -48,7 +51,7 @@ fn main() {
     // Step 3: Execute script with 'active' instruction
     // ========================================================================
     println!("\n3. Executing script with 'active' instruction...");
-    
+
     let script = r#"
         # Ensure window is in foreground before sending input
         active
@@ -60,20 +63,20 @@ fn main() {
         key L
         key O
     "#;
-    
+
     println!("   Script content:");
     for line in script.lines() {
         println!("     {}", line);
     }
-    
+
     println!("\n   Executing...");
-    
+
     // Compile once for better performance
     match engine.compile(script) {
         Ok(compiled_script) => {
             // Execute with interrupt control for safety
             let interrupt = InterruptController::new();
-            
+
             match engine.execute_with_interrupt(&compiled_script, &interrupt) {
                 Ok(_) => println!("   ✓ Script executed successfully!"),
                 Err(e) => {
@@ -94,10 +97,10 @@ fn main() {
     // ========================================================================
     println!("\n4. Error Handling Demo");
     println!("   Testing what happens when 'active' fails...");
-    
+
     // Create a simple test without proper window setup
     let test_script = "active";
-    
+
     match engine.compile_and_execute(test_script) {
         Ok(_) => println!("   Unexpected success (window was already active)"),
         Err(e) => {
@@ -115,7 +118,7 @@ fn main() {
     println!("✓ Uses adaptive polling (not fixed delay) for verification");
     println!("✓ Fails safely if activation is blocked by Windows");
     println!("✓ Essential for reliable keyboard/mouse automation");
-    
+
     println!("\n=== Best Practices ===");
     println!("1. Always call 'active' before input operations");
     println!("2. Check execution errors for activation failures");

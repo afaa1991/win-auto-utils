@@ -149,14 +149,15 @@ let pid = proc.pid().unwrap();
 let mut manager = ModifierManager::new();
 manager.set_context(handle, pid);
 
-// Register hook with shellcode
+// Register hook with shellcode (architecture auto-detected)
 let shellcode = vec![0x90, 0x90]; // NOP instruction
-let hook_handler = TrampolineHookHandler::new_x86_skip_trampoline(
+let hook_handler = TrampolineHookHandler::new_hook_aob_with_offset(
     "func_hook",
-    AddressSource::from_static_x86("target_app.exe+0x1000")?,
+    "48 8B 05 ?? ?? ?? ??",  // AOB pattern
     shellcode,
-    2,
-);
+    2,                        // bytes_to_overwrite
+    0x10,                     // offset
+)?;
 manager.register("func_hook", hook_handler);
 
 // Activate hook
@@ -310,18 +311,72 @@ See [Cargo.toml](Cargo.toml) for complete feature list.
 
 Explore the `examples/` directory for usage demonstrations:
 
-```bash
-# Run script engine example
-cargo run --example script_engine --features "script_engine"
+### Memory Manager Examples
 
-# Run DXGI capture example
+```bash
+# General memory manager usage
+cargo run --example memory_manager_example --features "memory_manager"
+```
+
+### Process & Window Management
+
+```bash
+# Process manager example
+cargo run --example process_manager_example --features "process"
+
+# Custom initialization flags
+cargo run --example custom_init_flags --features "process"
+
+# Window activation instruction
+cargo run --example active_instruction --features "scripts_window"
+```
+
+### Screen Capture
+
+```bash
+# DXGI capture example
 cargo run --example dxgi_capture --features "dxgi"
 
-# Run memory hook example
-cargo run --example memory_hook_reset --features "memory_hook"
+# Performance comparison
+cargo run --example dxgi_performance_comparison --features "dxgi"
+```
 
-# Run AOB scan benchmark
-cargo run --example aobscan_benchmark --features "memory_aobscan"
+### Script Engine
+
+```bash
+# Script engine with built-in instructions
+cargo run --example script_engine --features "script_engine,scripts_builtin"
+```
+
+### Color Operations
+
+```bash
+# Color conversion utilities
+cargo run --example color_conversion --features "color_picker"
+
+# Color finder re-exports
+cargo run --example color_reexports --features "color_finder"
+```
+
+### Clipboard
+
+```bash
+# Clipboard usage example
+cargo run --example clipboard_usage --features "clipboard"
+```
+
+### AOB Scanning
+
+```bash
+# 64-bit bytecode AOB scanning
+cargo run --example aobscan_64bit_bytecode --features "memory_aobscan"
+```
+
+### DLL Injection
+
+```bash
+# DLL injection example
+cargo run --example dll_injection --features "dll_injector"
 ```
 
 ## 🧪 Testing
@@ -337,4 +392,3 @@ cargo test --features "scripts_builtin"
 
 # Test memory operations
 cargo test --features "memory"
-```

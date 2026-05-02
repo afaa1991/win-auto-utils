@@ -21,7 +21,7 @@
 //! - [`TrampolineHookBuilder`] - Builder pattern for precise control
 
 mod alloc;
-mod hook;
 pub mod builder;
+mod hook;
 
 pub use hook::TrampolineHook;

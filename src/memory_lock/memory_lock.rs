@@ -1,9 +1,13 @@
 //! Memory Lock implementation
 //!
 //! Provides functionality to continuously monitor and restore memory values.
+//!
+//! # Module Note
+//! This module only supports static addresses (MemoryAddress).
+//! For dynamic address resolution with AOB scanning, use the new memory_manager::builtin::LockHandler.
 
 use crate::memory::{read_memory_bytes, write_memory_bytes, MemoryError};
-use crate::memory_resolver::{MemoryAddress, AddressSource};
+use crate::memory_resolver::MemoryAddress;
 use std::sync::{
     atomic::{AtomicBool, Ordering},
     Arc,
@@ -89,7 +93,7 @@ impl AsBytes for i64 {
 /// Builder for MemoryLock
 pub struct MemoryLockBuilder {
     handle: Option<HANDLE>,
-    address_source: Option<AddressSource>,
+    memory_address: Option<MemoryAddress>,
     pid: Option<u32>,
     locked_value: Option<Vec<u8>>,
     scan_interval: Duration,
@@ -100,7 +104,7 @@ impl MemoryLockBuilder {
     pub fn new() -> Self {
         Self {
             handle: None,
-            address_source: None,
+            memory_address: None,
             pid: None,
             locked_value: None,
             scan_interval: Duration::from_millis(100), // Default interval
@@ -121,23 +125,17 @@ impl MemoryLockBuilder {
             operations: vec![],
             pointer_size: crate::memory_resolver::PointerSize::default_architecture(),
         };
-        self.address_source = Some(AddressSource::from_static(mem_addr));
+        self.memory_address = Some(mem_addr);
         self
     }
 
     /// Set the dynamic address source (MemoryAddress pattern)
     pub fn address_from_resolver(mut self, addr: MemoryAddress) -> Self {
-        self.address_source = Some(AddressSource::from_static(addr));
+        self.memory_address = Some(addr);
         self
     }
 
-    /// Set an AOB pattern for dynamic address resolution
-    pub fn address_from_aob(mut self, pattern: &str) -> Result<Self, String> {
-        self.address_source = Some(AddressSource::from_aob_scan(pattern)?);
-        Ok(self)
-    }
-
-    /// Set the process ID (required for dynamic addresses)
+    /// Set the process ID (required for module-based addresses)
     pub fn pid(mut self, pid: u32) -> Self {
         self.pid = Some(pid);
         self
@@ -170,9 +168,9 @@ impl MemoryLockBuilder {
             )
         })?;
 
-        let address_source = self.address_source.ok_or_else(|| {
+        let memory_address = self.memory_address.ok_or_else(|| {
             MemoryError::WriteFailed(
-                "address must be set. Call .address(addr), .address_from_resolver(addr), or .address_from_aob(pattern) before build().".to_string()
+                "address must be set. Call .address(addr) or .address_from_resolver(addr) before build().".to_string()
             )
         })?;
 
@@ -185,27 +183,25 @@ impl MemoryLockBuilder {
 
         let size = locked_value.len();
 
-        // For module-based or AOB addresses, PID is recommended
+        // For module-based addresses, PID is recommended
         if self.pid.is_none() {
             // Check if we need PID
-            let needs_pid = match &address_source {
-                AddressSource::Static(addr) => {
-                    matches!(addr.base, crate::memory_resolver::AddressBase::Module { .. })
-                }
-                AddressSource::AobScan { .. } => true,
-            };
-            
+            let needs_pid = matches!(
+                memory_address.base,
+                crate::memory_resolver::AddressBase::Module { .. }
+            );
+
             if needs_pid {
                 return Err(MemoryError::WriteFailed(
-                    "PID must be set when using module-relative or AOB addresses. Call .pid(pid) before build().".to_string()
+                    "PID must be set when using module-relative addresses. Call .pid(pid) before build().".to_string()
                 ));
             }
         }
 
         Ok(MemoryLock {
-            handle: Some(handle),  // Store HANDLE directly
+            handle: Some(handle), // Store HANDLE directly
             pid: self.pid,
-            address_source: Some(address_source),
+            memory_address: Some(memory_address),
             size,
             locked_value,
             scan_interval: self.scan_interval,
@@ -216,6 +212,9 @@ impl MemoryLockBuilder {
 }
 
 /// Memory lock controller for continuous value monitoring and restoration
+///
+/// This struct uses a `MemoryAddress` to resolve the target address dynamically or statically.
+/// All address operations are performed through the `memory_address` field.
 ///
 /// # Example
 /// ```no_run
@@ -233,9 +232,9 @@ impl MemoryLockBuilder {
 /// # Ok::<_, Box<dyn std::error::Error>>(())
 /// ```
 pub struct MemoryLock {
-    handle: Option<HANDLE>,  // Store HANDLE directly for type consistency
-    address_source: Option<AddressSource>,
-    pid: Option<u32>,
+    handle: Option<HANDLE>, // Used for initial write and passed to monitoring thread
+    memory_address: Option<MemoryAddress>, // Core address source, supports static and dynamic resolution
+    pid: Option<u32>,                      // Required for module-based address resolution
     size: usize,
     locked_value: Vec<u8>,
     scan_interval: Duration,
@@ -289,14 +288,14 @@ impl MemoryLock {
             )
         })?;
 
-        let address_source = self.address_source.as_ref().ok_or_else(|| {
+        let memory_address = self.memory_address.as_ref().ok_or_else(|| {
             MemoryError::WriteFailed("address must be set. Call .address(addr), .address_from_resolver(addr), or .address_from_aob(pattern) before lock_value().".to_string())
         })?;
 
         let pid = self.pid.unwrap_or(0);
 
         // Resolve the actual address (tolerate errors if configured)
-        let address = match address_source.resolve(handle, pid) {
+        let address = match memory_address.resolve_address(handle, pid) {
             Ok(addr) => addr,
             Err(_) => {
                 // For dynamic addresses, we can tolerate initial resolution failure
@@ -335,14 +334,14 @@ impl MemoryLock {
             )
         })?;
 
-        let address_source = self.address_source.as_ref().ok_or_else(|| {
+        let memory_address = self.memory_address.as_ref().ok_or_else(|| {
             MemoryError::WriteFailed("address must be set. Call .address(addr), .address_from_resolver(addr), or .address_from_aob(pattern) before lock_bytes().".to_string())
         })?;
 
         let pid = self.pid.unwrap_or(0);
 
         // Resolve the actual address (tolerate errors if configured)
-        let address = match address_source.resolve(handle, pid) {
+        let address = match memory_address.resolve_address(handle, pid) {
             Ok(addr) => addr,
             Err(_) => {
                 // For dynamic addresses, we can tolerate initial resolution failure
@@ -370,7 +369,7 @@ impl MemoryLock {
     /// Start the monitoring thread
     fn start_monitoring(&mut self) -> Result<(), MemoryError> {
         let handle = self.handle.unwrap();
-        let address_source = self.address_source.clone().unwrap();
+        let memory_address = self.memory_address.clone().unwrap();
         let pid = self.pid.unwrap_or(0);
         let size = self.size;
         let locked_value = self.locked_value.clone();
@@ -388,7 +387,7 @@ impl MemoryLock {
                 thread::sleep(scan_interval);
 
                 // Resolve the actual address (tolerate errors if configured)
-                let address = match address_source.resolve(handle, pid) {
+                let address = match memory_address.resolve_address(handle, pid) {
                     Ok(addr) => addr,
                     Err(_) => continue,
                 };
@@ -411,11 +410,10 @@ impl MemoryLock {
         Ok(())
     }
 
-    /// Stop the monitoring thread
+    /// Stop the monitoring thread without destroying the instance
     ///
-    /// This method gracefully stops the background monitoring thread.
-    /// After calling this, you can call `lock_value()` or `lock_bytes()` again
-    /// to restart monitoring with new parameters.
+    /// This method signals the background thread to stop and waits for it to finish.
+    /// The MemoryLock instance can be restarted later using `lock_value()` or `lock_bytes()`.
     ///
     /// # Example
     /// ```no_run
@@ -427,26 +425,43 @@ impl MemoryLock {
     ///     .address(0x1000)
     ///     .value(100u32)
     ///     .build()?;
-    /// lock.lock_value(100u32)?; // Start locking
-    /// 
-    /// // ... some time later ...
-    /// lock.stop(); // Stop the monitoring thread
+    ///
+    /// lock.lock_value(100u32)?;  // Start locking
+    /// lock.stop()?;              // Stop locking (pause)
+    /// lock.lock_value(100u32)?;  // Resume locking with same value
     /// # Ok::<_, Box<dyn std::error::Error>>(())
     /// ```
-    pub fn stop(&mut self) {
+    pub fn stop(&mut self) -> Result<(), MemoryError> {
         // Signal the worker thread to stop
         self.stop_flag.store(true, Ordering::SeqCst);
-        
-        // Wait for the thread to finish (with timeout to avoid hanging)
+
+        // Wait for the thread to finish
         if let Some(handle) = self.worker_thread.take() {
-            // Give the thread up to 1 second to finish
             let _ = handle.join();
         }
+
+        Ok(())
+    }
+
+    /// Check if the monitoring thread is currently running
+    pub fn is_running(&self) -> bool {
+        self.worker_thread.is_some() && !self.stop_flag.load(Ordering::SeqCst)
+    }
+
+    /// Get the process handle used by this lock instance
+    pub fn get_handle(&self) -> Option<HANDLE> {
+        self.handle
+    }
+
+    /// Get the process ID used by this lock instance
+    pub fn get_pid(&self) -> Option<u32> {
+        self.pid
     }
 }
 
 impl Drop for MemoryLock {
     fn drop(&mut self) {
-        self.stop();
+        // Use the stop method to gracefully shut down the thread
+        let _ = self.stop();
     }
 }

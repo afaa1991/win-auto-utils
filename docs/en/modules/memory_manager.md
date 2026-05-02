@@ -84,17 +84,38 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
 ```rust
 use win_auto_utils::memory_manager::builtin::TrampolineHookHandler;
-use win_auto_utils::memory_resolver::AddressSource;
 
-// Dynamically find address via byte pattern
+// Dynamically find address via byte pattern (architecture auto-detected)
 let shellcode = vec![0x90, 0x90]; // NOP instruction
-let hook_handler = TrampolineHookHandler::new_x86_skip_trampoline(
+let hook_handler = TrampolineHookHandler::new_hook_aob_with_offset(
     "function_hook",
-    AddressSource::from_pattern_x86("target_app.exe+1F9C9")?,
+    "48 8B 05 ?? ?? ?? ??",  // AOB pattern
+    shellcode,
+    2,                        // bytes_to_overwrite
+    0x10,                     // offset from pattern match
+)?;
+manager.register("function_hook", hook_handler);
+```
+
+### Using Custom Memory Range for AOB Scanning
+
+```rust
+use win_auto_utils::memory_manager::builtin::TrampolineHookHandler;
+
+// Scan within specific memory range for better performance
+let start_address = 0x10000000000usize;
+let length = 0x20000000000usize;
+
+let hook_handler = TrampolineHookHandler::new_hook_aob_with_range_and_offset(
+    "optimized_hook",
+    "48 8B 05 ?? ?? ?? ??",
     shellcode,
     2,
-);
-manager.register("function_hook", hook_handler);
+    start_address,
+    length,
+    0x10,
+)?;
+manager.register("optimized_hook", hook_handler);
 ```
 
 ### Batch Operations
@@ -211,57 +232,84 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 ### Built-in Handlers
 
 #### LockHandler
-Used for continuous monitoring and value restoration (freeze effect).
+Used for continuous monitoring and value restoration (freeze effect). Architecture is automatically detected at activation time.
 
 **Constructors:**
-- `new_lock_x86_typed(name, address, value, interval)` - x86 static address
-- `new_lock_x64_typed(name, address, value, interval)` - x64 static address
-- `new_lock_aob_typed(name, pattern, value, interval)` - AOB pattern scanning
+- `new_lock(name, address_pattern, value, interval)` - Static address with auto-detection
+- `new_lock_aob(name, pattern, value, interval)` - AOB pattern scanning
 
 **Example:**
 ```rust
-let handler = LockHandler::new_lock_x86_typed(
+use std::time::Duration;
+
+let handler = LockHandler::new_lock(
     "value_lock",
-    "target_app.exe+0x1000",
+    "target_app.exe+1000",  // Hex by default, no 0x prefix needed
     100i32,
     Duration::from_millis(100),
 )?;
 ```
 
+**Performance Notes:**
+- **First Activation**: Includes address resolution and thread creation (~50-100ms)
+- **Subsequent Activations**: Reuses existing thread instance (<1ms) when reactivating in the same process
+- **Deactivation**: Stops monitoring thread but keeps instance (~30-50µs)
+- **Process Switch**: Automatically recreates instance for new process context
+
+---
+
 #### BytesSwitchHandler
-Used for bytecode switching (NOP patches, etc.).
+Used for bytecode switching (NOP patches, etc.). Architecture is automatically detected.
 
 **Constructors:**
-- `new_nop_switch_x86(name, address, length)` - x86 NOP switching
-- `new_nop_switch_x64(name, address, length)` - x64 NOP switching
-- `new_custom_switch_x86(name, address, original_bytes, modified_bytes)` - Custom switching
+- `new_bytes_switch(name, address_pattern, byte_count, patch_bytes)` - Static address with custom bytes
+- `new_nop_switch(name, address_pattern, length)` - NOP switching
+- `new_bytes_switch_aob(name, pattern, byte_count, patch_bytes)` - AOB pattern scanning
+- `new_nop_switch_aob(name, pattern, length)` - AOB NOP switching
 
 **Example:**
 ```rust
-let handler = BytesSwitchHandler::new_nop_switch_x86(
+let handler = BytesSwitchHandler::new_nop_switch(
     "nop_patch",
     "target_app.exe+0x2000",
     2,
 )?;
 ```
 
+**Performance Notes:**
+- **First Activation**: Includes address resolution (~50-500ms for AOB)
+- **Subsequent Activations**: Reuses existing instance (<1ms) when reactivating in the same process
+- **Deactivation**: Restores original bytes but keeps instance (~30-50µs)
+- **Process Switch**: Automatically recreates instance for new process context
+
+---
+
 #### TrampolineHookHandler
-Used for function hooking while preserving original functionality.
+Used for function hooking while preserving original functionality. Architecture is automatically detected from the target process.
 
 **Constructors:**
-- `new_x86_skip_trampoline(name, address_source, shellcode, bytes_to_overwrite)` - x86 hook
-- `new_x64_skip_trampoline(name, address_source, shellcode, bytes_to_overwrite)` - x64 hook
+- `new_hook_aob(name, pattern, shellcode, bytes_to_overwrite)` - AOB pattern scanning
+- `new_hook_aob_with_offset(name, pattern, shellcode, bytes_to_overwrite, offset)` - AOB with offset
+- `new_hook_aob_with_range_and_offset(name, pattern, shellcode, bytes_to_overwrite, start_address, length, offset)` - AOB with custom range and offset
+- `new_skip_trampoline_aob(name, pattern, shellcode, bytes_to_overwrite)` - Skip trampoline mode (no original function call)
 
 **Example:**
 ```rust
 let shellcode = vec![0x90, 0x90]; // NOP instruction
-let handler = TrampolineHookHandler::new_x86_skip_trampoline(
+let handler = TrampolineHookHandler::new_hook_aob_with_offset(
     "func_hook",
-    AddressSource::from_static_x86("target_app.exe+0x3000")?,
+    "48 8B 05 ?? ?? ?? ??",
     shellcode,
     2,
-);
+    0x10,
+)?;
 ```
+
+**Performance Notes:**
+- **First Activation**: Includes AOB scanning (50-500ms depending on memory size)
+- **Subsequent Activations**: Uses cached address (<1ms) when reactivating in the same process
+- **Deactivation**: Fast operation (~30-50µs), preserves address cache for quick reactivation
+- **Process Switch**: Automatically clears cache and rescans when switching to a different process
 
 ## Best Practices
 
@@ -319,15 +367,17 @@ for feature in &features {
 
 ### Q: How to handle process restart?
 
-A: After reinitializing the process, reset the context:
+A: After reinitializing the process, reset the context. The manager will automatically detect the change and clear caches:
 
 ```rust
 process_mgr.reinit("target_app.exe")?;
 let proc = process_mgr.get("target_app.exe").unwrap();
 manager.set_context(proc.handle().unwrap(), proc.pid().unwrap());
-// Reactivate needed features
+// Reactivate needed features (will use cached addresses if same process)
 manager.activate_all()?;
 ```
+
+**Note**: `set_context()` automatically deactivates all handlers and clears AOB region caches to ensure safe switching between processes.
 
 ### Q: Can I dynamically add new modifiers?
 
@@ -355,6 +405,11 @@ if manager.is_active("hp_lock") {
 - **On-Demand Activation**: Inactive modifiers consume no CPU resources
 - **Background Threads**: LockHandler uses independent threads without affecting main thread performance
 - **Batch Operations**: `activate_all()` executes serially, suitable for initialization phase
+- **Address Caching**: AOB scanning results are cached for fast reactivation in the same process
+  - First activation: ~50-500ms (includes AOB scan)
+  - Subsequent activations: <1ms (uses cached address)
+  - Deactivation: ~30-50µs (preserves cache)
+- **Instance Reuse**: Handlers reuse internal instances when reactivating in the same process, avoiding reconstruction overhead
 
 ## Related Modules
 

@@ -34,19 +34,24 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         let y = (screen_h as i32 - *height as i32) / 2;
 
         // Method 1: Direct Region Capture (NEW - Optimized)
-        let direct_times = benchmark_direct_capture(x, y, *width as i32, *height as i32, iterations)?;
-        
+        let direct_times =
+            benchmark_direct_capture(x, y, *width as i32, *height as i32, iterations)?;
+
         // Method 2: Full-screen + Crop (OLD - Simulated)
-        let crop_times = benchmark_fullscreen_crop(x, y, *width as i32, *height as i32, iterations)?;
+        let crop_times =
+            benchmark_fullscreen_crop(x, y, *width as i32, *height as i32, iterations)?;
 
         // Calculate statistics
         let direct_avg = direct_times.iter().sum::<f64>() / direct_times.len() as f64;
         let crop_avg = crop_times.iter().sum::<f64>() / crop_times.len() as f64;
-        
+
         let direct_min = direct_times.iter().cloned().fold(f64::INFINITY, f64::min);
         let crop_min = crop_times.iter().cloned().fold(f64::INFINITY, f64::min);
-        
-        let direct_max = direct_times.iter().cloned().fold(f64::NEG_INFINITY, f64::max);
+
+        let direct_max = direct_times
+            .iter()
+            .cloned()
+            .fold(f64::NEG_INFINITY, f64::max);
         let crop_max = crop_times.iter().cloned().fold(f64::NEG_INFINITY, f64::max);
 
         let speedup = crop_avg / direct_avg;
@@ -56,26 +61,53 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         println!("");
         println!(" Metric                   Direct        Full+Crop    ");
         println!("");
-        println!(" Average Time             {:>8.2}ms  {:>8.2}ms ", direct_avg, crop_avg);
-        println!(" Min Time                 {:>8.2}ms  {:>8.2}ms ", direct_min, crop_min);
-        println!(" Max Time                 {:>8.2}ms  {:>8.2}ms ", direct_max, crop_max);
-        println!(" Estimated FPS            {:>8.1}    {:>8.1}   ", 1000.0 / direct_avg, 1000.0 / crop_avg);
+        println!(
+            " Average Time             {:>8.2}ms  {:>8.2}ms ",
+            direct_avg, crop_avg
+        );
+        println!(
+            " Min Time                 {:>8.2}ms  {:>8.2}ms ",
+            direct_min, crop_min
+        );
+        println!(
+            " Max Time                 {:>8.2}ms  {:>8.2}ms ",
+            direct_max, crop_max
+        );
+        println!(
+            " Estimated FPS            {:>8.1}    {:>8.1}   ",
+            1000.0 / direct_avg,
+            1000.0 / crop_avg
+        );
         println!("");
-        
+
         println!("\n🚀 Performance Gain:");
         println!("   Speedup: {:.2}x faster", speedup);
-        println!("   Improvement: {:.1}% reduction in capture time", improvement_pct);
-        
+        println!(
+            "   Improvement: {:.1}% reduction in capture time",
+            improvement_pct
+        );
+
         // Memory comparison
         let direct_mem = (*width * *height * 4) as usize;
         let fullscreen_mem = (screen_w * screen_h * 4) as usize;
         let mem_saved = fullscreen_mem - direct_mem;
         let mem_saved_pct = (mem_saved as f64 / fullscreen_mem as f64) * 100.0;
-        
+
         println!("\n💾 Memory Efficiency:");
-        println!("   Direct method: {} bytes ({:.2} MB)", direct_mem, direct_mem as f64 / 1024.0 / 1024.0);
-        println!("   Full+Crop method: {} bytes ({:.2} MB)", fullscreen_mem, fullscreen_mem as f64 / 1024.0 / 1024.0);
-        println!("   Memory saved: {} bytes ({:.1}%)", mem_saved, mem_saved_pct);
+        println!(
+            "   Direct method: {} bytes ({:.2} MB)",
+            direct_mem,
+            direct_mem as f64 / 1024.0 / 1024.0
+        );
+        println!(
+            "   Full+Crop method: {} bytes ({:.2} MB)",
+            fullscreen_mem,
+            fullscreen_mem as f64 / 1024.0 / 1024.0
+        );
+        println!(
+            "   Memory saved: {} bytes ({:.1}%)",
+            mem_saved, mem_saved_pct
+        );
     }
 
     println!("\n\n{}", "=".repeat(60));
@@ -84,7 +116,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("✅ Direct region capture is significantly faster and more memory-efficient");
     println!("✅ Smaller regions show greater performance improvements");
     println!("✅ Recommended for real-time applications and frequent captures");
-    
+
     Ok(())
 }
 
@@ -97,10 +129,10 @@ fn benchmark_direct_capture(
     iterations: usize,
 ) -> Result<Vec<f64>, Box<dyn std::error::Error>> {
     let mut times = Vec::with_capacity(iterations);
-    
+
     print!("Testing direct capture... ");
     std::io::Write::flush(&mut std::io::stdout())?;
-    
+
     for _ in 0..iterations {
         let start = Instant::now();
         match win_auto_utils::dxgi::capture_region_bytes(x, y, width, height) {
@@ -114,7 +146,7 @@ fn benchmark_direct_capture(
             }
         }
     }
-    
+
     println!("✓ Done ({} captures)", iterations);
     Ok(times)
 }
@@ -128,34 +160,30 @@ fn benchmark_fullscreen_crop(
     iterations: usize,
 ) -> Result<Vec<f64>, Box<dyn std::error::Error>> {
     use win_auto_utils::dxgi;
-    
+
     let mut times = Vec::with_capacity(iterations);
-    
+
     print!("Testing full-screen + crop... ");
     std::io::Write::flush(&mut std::io::stdout())?;
-    
+
     // Get screen size once
     let (screen_w, screen_h) = dxgi::get_screen_size()?;
-    
+
     for _ in 0..iterations {
         let start = Instant::now();
-        
+
         // Step 1: Capture full screen
-        let full_bytes = dxgi::capture_region_bytes(
-            0, 0, 
-            screen_w as i32, 
-            screen_h as i32
-        )?;
-        
+        let full_bytes = dxgi::capture_region_bytes(0, 0, screen_w as i32, screen_h as i32)?;
+
         // Step 2: Manual crop (simulate the old inefficient method)
         let row_bytes = (width * 4) as usize;
         let total_bytes = row_bytes * height as usize;
         let mut cropped = vec![0u8; total_bytes];
-        
+
         for row in 0..height as usize {
             let src_offset = ((y as usize + row) * screen_w + x as usize) * 4;
             let dst_offset = row * row_bytes;
-            
+
             unsafe {
                 std::ptr::copy_nonoverlapping(
                     full_bytes.as_ptr().add(src_offset),
@@ -164,11 +192,11 @@ fn benchmark_fullscreen_crop(
                 );
             }
         }
-        
+
         let elapsed = start.elapsed().as_secs_f64() * 1000.0;
         times.push(elapsed);
     }
-    
+
     println!("✓ Done ({} captures)", iterations);
     Ok(times)
 }

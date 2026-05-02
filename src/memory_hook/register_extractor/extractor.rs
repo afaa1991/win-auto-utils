@@ -3,9 +3,9 @@
 //! Provides automatic register extraction at hook points using TrampolineHook.
 
 use crate::memory::{read_memory_t, write_memory_t, MemoryError};
-use crate::memory_hook::TrampolineHook;
-use crate::memory_hook::register_extractor::register::{Register, calculate_storage_size};
+use crate::memory_hook::register_extractor::register::{calculate_storage_size, Register};
 use crate::memory_hook::shellcode::ShellcodeBuilder;
+use crate::memory_hook::TrampolineHook;
 use windows::Win32::Foundation::HANDLE;
 use windows::Win32::System::Memory::{
     VirtualAllocEx, VirtualFreeEx, MEM_COMMIT, MEM_RELEASE, MEM_RESERVE, PAGE_READWRITE,
@@ -58,7 +58,7 @@ impl RegisterExtractor {
         is_x64: bool,
     ) -> Self {
         let storage_size = calculate_storage_size(&extracted_regs, is_x64);
-        
+
         // Allocate storage memory with PAGE_READWRITE
         let storage_address = unsafe {
             VirtualAllocEx(
@@ -75,15 +75,12 @@ impl RegisterExtractor {
         }
 
         // Generate detour shellcode that extracts registers
-        let detour_code = Self::generate_extraction_shellcode(
-            &extracted_regs,
-            storage_address as usize,
-            is_x64,
-        );
+        let detour_code =
+            Self::generate_extraction_shellcode(&extracted_regs, storage_address as usize, is_x64);
 
         // Create internal TrampolineHook
         let mut hook = TrampolineHook::auto_new(handle, target_address, detour_code);
-        
+
         // Set architecture
         hook.set_architecture(is_x64);
 
@@ -114,37 +111,37 @@ impl RegisterExtractor {
         if is_x64 {
             // 🚀 OPTIMIZED: Only save registers that are actually used + R11 (temporary pointer)
             // This is much more efficient than saving all 16 registers
-            
+
             // Collect unique registers that need to be saved
             let mut regs_to_save: Vec<u8> = Vec::new();
-            
+
             for &reg in regs {
                 let reg_index = reg.register_index();
-                
+
                 // Add if not already in list
                 if !regs_to_save.contains(&reg_index) {
                     regs_to_save.push(reg_index);
                 }
             }
-            
+
             // Always save R11 (used as temporary pointer), unless it's already in the list
             if !regs_to_save.contains(&11) {
                 regs_to_save.push(11);
             }
-            
+
             // Sort for consistent PUSH/POP order (ascending for PUSH, descending for POP)
             regs_to_save.sort();
-            
+
             // PUSH registers in ascending order
             for &reg_idx in &regs_to_save {
                 builder.push_reg_x64(reg_idx);
             }
-            
+
             // Store specified registers to memory
             for &reg in regs {
                 let offset = reg.offset(is_x64);
                 let addr = storage_base + offset;
-                
+
                 // Check if this is a 32-bit register alias
                 if reg.is_32bit_alias() {
                     Self::store_register_x64_32bit(&mut builder, reg, addr);
@@ -152,7 +149,7 @@ impl RegisterExtractor {
                     Self::store_register_x64(&mut builder, reg, addr);
                 }
             }
-            
+
             // POP registers in reverse (descending) order
             for reg_idx in regs_to_save.iter().rev() {
                 builder.pop_reg_x64(*reg_idx);
@@ -239,13 +236,13 @@ impl RegisterExtractor {
     pub fn read_register<T: Copy>(&self, reg: Register) -> Result<T, MemoryError> {
         if !self.is_installed {
             return Err(MemoryError::InvalidAddress(
-                "RegisterExtractor is not installed".to_string()
+                "RegisterExtractor is not installed".to_string(),
             ));
         }
 
         let offset = reg.offset(self.is_x64);
         let addr = self.storage_address + offset;
-        
+
         read_memory_t(self.hook.handle.0, addr)
     }
 
@@ -263,16 +260,16 @@ impl RegisterExtractor {
     pub fn read_chain<T: Copy>(&self, reg: Register, offsets: &[usize]) -> Result<T, MemoryError> {
         if !self.is_installed {
             return Err(MemoryError::InvalidAddress(
-                "RegisterExtractor is not installed".to_string()
+                "RegisterExtractor is not installed".to_string(),
             ));
         }
 
         // Read base pointer from register
         let base_ptr: usize = self.read_register::<usize>(reg)?;
-        
+
         if base_ptr == 0 {
             return Err(MemoryError::InvalidAddress(
-                "Null pointer encountered in chain".to_string()
+                "Null pointer encountered in chain".to_string(),
             ));
         }
 
@@ -287,11 +284,12 @@ impl RegisterExtractor {
                 // Otherwise, dereference to get next pointer
                 current_addr += offset;
                 current_addr = read_memory_t::<usize>(self.hook.handle.0, current_addr)?;
-                
+
                 if current_addr == 0 {
-                    return Err(MemoryError::InvalidAddress(
-                        format!("Null pointer at chain level {}", i)
-                    ));
+                    return Err(MemoryError::InvalidAddress(format!(
+                        "Null pointer at chain level {}",
+                        i
+                    )));
                 }
             }
         }
@@ -323,7 +321,7 @@ impl RegisterExtractor {
     /// ```no_run
     /// // Extract RDI (skill object base address)
     /// let rdi_addr = extractor.get_register_storage_address(Register::RDI);
-    /// 
+    ///
     /// // Use as base address for MemoryLock with offset [+0x98]
     /// let skill_count_addr = MemoryAddress::new(rdi_addr, vec![0x98], pid);
     /// ```

@@ -51,14 +51,14 @@ pub fn generate_call_function_shellcode_x64(
     param_size: usize,
 ) -> Vec<u8> {
     let mut code = Vec::new();
-    
+
     // Save registers
     code.extend_from_slice(&[0x50]); // push rax
     code.extend_from_slice(&[0x53]); // push rbx
-    
+
     // Align stack to 16 bytes
     code.extend_from_slice(&[0x48, 0x83, 0xEC, 0x28]); // sub rsp, 0x28
-    
+
     if param_size > 0 && param_addr != 0 {
         // Load parameter into appropriate register based on size
         if param_size == 4 {
@@ -67,7 +67,7 @@ pub fn generate_call_function_shellcode_x64(
             code.extend_from_slice(&[0x48, 0xB8]); // mov rax, imm64
             code.extend_from_slice(&(param_addr as u64).to_le_bytes());
             code.extend_from_slice(&[0x8B, 0x08]); // mov ecx, [rax]
-            
+
             // Zero extend to RCX
             code.extend_from_slice(&[0x48, 0x63, 0xC9]); // movsxd rcx, ecx
         } else if param_size == 8 {
@@ -84,24 +84,24 @@ pub fn generate_call_function_shellcode_x64(
         // No parameter - zero out RCX
         code.extend_from_slice(&[0x48, 0x31, 0xC9]); // xor rcx, rcx
     }
-    
+
     // Call the target function
     code.extend_from_slice(&[0x48, 0xB8]); // mov rax, imm64
     code.extend_from_slice(&(function_address as u64).to_le_bytes());
     code.extend_from_slice(&[0xFF, 0xD0]); // call rax
-    
+
     // Result is in RAX (will be thread exit code)
-    
+
     // Restore stack
     code.extend_from_slice(&[0x48, 0x83, 0xC4, 0x28]); // add rsp, 0x28
-    
+
     // Restore registers
     code.extend_from_slice(&[0x5B]); // pop rbx
     code.extend_from_slice(&[0x58]); // pop rax
-    
+
     // Return
     code.extend_from_slice(&[0xC3]); // ret
-    
+
     code
 }
 
@@ -147,7 +147,7 @@ pub fn generate_call_function_shellcode_x86(
     param_size: usize,
 ) -> Vec<u8> {
     let mut code = Vec::new();
-    
+
     if param_size > 0 && param_addr != 0 {
         // Push parameter onto stack
         if param_size <= 4 {
@@ -162,21 +162,21 @@ pub fn generate_call_function_shellcode_x86(
             code.extend_from_slice(&(param_addr as u32).to_le_bytes());
         }
     }
-    
+
     // Call the target function
     code.extend_from_slice(&[0xB8]); // mov eax, imm32
     code.extend_from_slice(&(function_address as u32).to_le_bytes());
     code.extend_from_slice(&[0xFF, 0xD0]); // call eax
-    
+
     // Clean up stack if we pushed a parameter (__cdecl)
     // For __stdcall, callee cleans up, so no adjustment needed
     // We'll assume __stdcall for simplicity
-    
+
     // Result is in EAX (will be thread exit code)
-    
+
     // Return
     code.extend_from_slice(&[0xC3]); // ret
-    
+
     code
 }
 
@@ -214,33 +214,31 @@ pub fn generate_call_function_shellcode_x86(
 /// 2. Executed via CreateRemoteThread or similar mechanism
 /// 3. Target function signature should be compatible (no parameters)
 #[cfg(target_arch = "x86_64")]
-pub fn generate_call_function_no_params_shellcode_x64(
-    function_address: usize,
-) -> Vec<u8> {
+pub fn generate_call_function_no_params_shellcode_x64(function_address: usize) -> Vec<u8> {
     let mut code = Vec::new();
-    
+
     // Save registers (minimal set for simple call)
     code.extend_from_slice(&[0x50]); // push rax
     code.extend_from_slice(&[0x53]); // push rbx
-    
+
     // Align stack to 16 bytes (required by Windows x64 ABI)
     code.extend_from_slice(&[0x48, 0x83, 0xEC, 0x28]); // sub rsp, 0x28
-    
+
     // Call the target function directly
     code.extend_from_slice(&[0x48, 0xB8]); // mov rax, imm64
     code.extend_from_slice(&(function_address as u64).to_le_bytes());
     code.extend_from_slice(&[0xFF, 0xD0]); // call rax
-    
+
     // Result is in RAX (will be thread exit code)
-    
+
     // Restore stack and registers
     code.extend_from_slice(&[0x48, 0x83, 0xC4, 0x28]); // add rsp, 0x28
     code.extend_from_slice(&[0x5B]); // pop rbx
     code.extend_from_slice(&[0x58]); // pop rax
-    
+
     // Return
     code.extend_from_slice(&[0xC3]); // ret
-    
+
     code
 }
 
@@ -274,20 +272,18 @@ pub fn generate_call_function_no_params_shellcode_x64(
 /// 2. Executed via CreateRemoteThread or similar mechanism
 /// 3. Target function signature should be compatible (no parameters)
 #[cfg(target_arch = "x86")]
-pub fn generate_call_function_no_params_shellcode_x86(
-    function_address: usize,
-) -> Vec<u8> {
+pub fn generate_call_function_no_params_shellcode_x86(function_address: usize) -> Vec<u8> {
     let mut code = Vec::new();
-    
+
     // Call the target function directly (no parameters to push)
     code.extend_from_slice(&[0xB8]); // mov eax, imm32
     code.extend_from_slice(&(function_address as u32).to_le_bytes());
     code.extend_from_slice(&[0xFF, 0xD0]); // call eax
-    
+
     // Result is in EAX (will be thread exit code)
-    
+
     // Return
     code.extend_from_slice(&[0xC3]); // ret
-    
+
     code
 }
