@@ -8,7 +8,7 @@ The `template_matcher` module provides high-performance image template matching 
 
 ```toml
 [dependencies]
-win-auto-utils = { version = "0.1.0", features = ["template_matcher"] }
+win-auto-utils = { version = "0.2.3", features = ["template_matcher"] }
 ```
 
 **Platform**: Windows only (requires DXGI support)

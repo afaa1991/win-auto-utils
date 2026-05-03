@@ -8,7 +8,7 @@ The `memory_aobscan` module provides high-performance pattern scanning in remote
 
 ```toml
 [dependencies]
-win-auto-utils = { version = "0.1.0", features = ["memory_aobscan"] }
+win-auto-utils = { version = "0.2.3", features = ["memory_aobscan"] }
 ```
 
 ## Quick Start

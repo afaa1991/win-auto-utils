@@ -21,11 +21,11 @@
 
 ### 核心优势
 
-✅ **原子化设计**: 通过 feature flags 按需启用功能  
-✅ **最小依赖**: 核心功能仅依赖 `windows` crate  
-✅ **高性能**: Release 模式开启 LTO、体积优化、符号剥离  
-✅ **安全性**: Rust 所有权系统防止常见内存错误  
-✅ **跨平台脚本引擎**: 纯 Rust 实现，无外部依赖  
+✅ **原子化设计**: 通过 feature flags 按需启用功能
+✅ **最小依赖**: 核心功能仅依赖 `windows` crate
+✅ **高性能**: Release 模式开启 LTO、体积优化、符号剥离
+✅ **安全性**: Rust 所有权系统防止常见内存错误
+✅ **跨平台脚本引擎**: 纯 Rust 实现，无外部依赖
 
 ## 📦 安装
 
@@ -33,26 +33,64 @@
 
 ```
 [dependencies]
-win-auto-utils = { version = "0.1.0", features = ["standard"] }
+win-auto-utils = { version = "0.2.3", features = ["standard"] }
 ```
 
 如需包含模板匹配等完整功能：
 
 ```
 [dependencies]
-win-auto-utils = { version = "0.1.0", features = ["full"] }
+win-auto-utils = { version = "0.2.3", features = ["full"] }
 ```
 
 ## 🎯 快速开始
 
 ### 进程管理
 
-```rust
-use win_auto_utils::process::Process;
+**仅需三种类型即可完成全部功能！**
 
-let process = Process::builder("notepad.exe").build();
-process.init()?;
-println!("PID: {}", process.get_pid());
+```rust
+use win_auto_utils::process::{Process, ProcessConfig, ProcessManager};
+
+// 方式1: 按名称一步初始化（最便捷）
+let mut process = Process::init_by_name("notepad.exe")?;
+println!("PID: {}", process.pid_or_default());
+
+// 方式2: 按 PID 一步初始化（已知 PID 时使用）
+let process = Process::init_by_pid(12345)?;
+println!("HWND: {:?}", process.hwnd_or_default());
+
+// 方式3: 使用 Builder 构建配置（无需枚举类型！）
+let config = ProcessConfig::builder("target.exe")
+    .set_window_client_mode()  // 易于记忆 - 无需 DCMode 枚举！
+    .exclude_invisible()
+    .include_by_title("Game Window")
+    .build();
+let mut game = Process::new(config);
+game.init()?;
+
+// 方式4: 实例方法 init_with_pid（用于区分同一进程的多个实例）
+let mut app = Process::by_name("target.exe");
+app.init()?;  // 初始化第一个实例
+// 之后切换到特定 PID 的第二个实例
+app.init_with_pid(20908)?;
+
+// Manager API（简洁直观）：
+let mut manager = ProcessManager::new();
+manager.register("notepad.exe")?;  // 进程名作为 key
+manager.register_alias("game", "target.exe")?;  // 自定义别名
+manager.init("notepad.exe")?;
+manager.init_with_pid("game", 12345)?;  // 用指定 PID 初始化
+
+// 查询进程（只读，无需 mut）
+if let Some(proc) = manager.get("notepad.exe") {
+    println!("PID: {:?}", proc.pid());
+}
+
+// DC 模式选项（直观的方法名）：
+// - .set_window_mode()        -> 标准窗口 DC (GetWindowDC)
+// - .set_window_client_mode() -> 客户端区域 DC (GetDC) - 游戏最佳选择
+// - .set_desktop_mode()       -> 桌面 DC 用于全屏捕获
 ```
 
 ### 内存操作
@@ -70,15 +108,24 @@ write_memory_t::<f32>(handle, address, 999.0)?;
 ### 输入模拟
 
 ```rust
-use win_auto_utils::keyboard::key_press;
-use win_auto_utils::mouse::{move_to, left_click};
+use win_auto_utils::keyboard::{SendInputKeyboard, PostMessageKeyboard};
+use win_auto_utils::mouse::{SendInputMouse, PostMessageMouse};
 
-// 按下 'A' 键
-key_press(handle, 0x41)?;
+// SendInput 方式（系统级输入，适用于所有应用）
+let mut kb = SendInputKeyboard::new();
+kb.click("a")?;
 
-// 移动鼠标并点击
-move_to(handle, 100, 200)?;
-left_click(handle)?;
+let mut mouse = SendInputMouse::new();
+mouse.move_to(100, 200)?;
+mouse.click_left()?;
+
+// PostMessage 方式（后台输入，不需要焦点，需要目标窗口句柄）
+let kb = PostMessageKeyboard::new(hwnd);
+kb.click("a")?;
+
+let mouse = PostMessageMouse::new(hwnd);
+mouse.move_to(100, 200)?;
+mouse.click_left_at(100, 200)?;
 ```
 
 ### 屏幕捕获 (DXGI)
@@ -89,6 +136,34 @@ use win_auto_utils::dxgi::DxgiCapture;
 let mut capture = DxgiCapture::new()?;
 let image = capture.capture_window(hwnd)?;
 ```
+
+### 颜色查找
+
+在屏幕区域或像素缓冲区中搜索颜色，支持 AVX2 自动优化：
+
+```rust
+use win_auto_utils::color_finder::{find_color, find_color_in_buffer};
+
+// 方式1: 在屏幕区域中查找颜色（内部使用 DXGI 捕获）
+match find_color(100, 100, 50, 50, (255, 0, 0)) {  // 在 50x50 区域中搜索红色
+    Ok(result) => {
+        if result.matched {
+            println!("在屏幕坐标 ({}, {}) 找到", result.x, result.y);
+        }
+    }
+    Err(e) => eprintln!("错误: {}", e),
+}
+
+// 方式2: 在像素缓冲区中查找颜色（纯算法，无需屏幕捕获）
+use win_auto_utils::color_finder::algorithms::find_color_in_buffer;
+let buffer: Vec<u8> = vec![0; 100 * 100 * 4];  // 100x100 BGRA 像素
+let result = find_color_in_buffer(&buffer, 100, 100, (0, 255, 0));  // 搜索绿色
+```
+
+**特性:**
+- AVX2 SIMD 加速（在支持的硬件上快 4-8 倍）
+- 自动回退到标量实现
+- 支持任何 BGRA 像素缓冲区来源
 
 ### 内存钩子（推荐：使用内存管理器）
 
@@ -110,14 +185,15 @@ let pid = proc.pid().unwrap();
 let mut manager = ModifierManager::new();
 manager.set_context(handle, pid);
 
-// 注册钩子和shellcode
-let shellcode = vec![0x90, 0x90]; // NOP指令
-let hook_handler = TrampolineHookHandler::new_x86_skip_trampoline(
+// 使用 shellcode 注册钩子（架构自动检测）
+let shellcode = vec![0x90, 0x90]; // NOP 指令
+let hook_handler = TrampolineHookHandler::new_hook_aob_with_offset(
     "func_hook",
-    AddressSource::from_static_x86("target_app.exe+0x1000")?,
+    "48 8B 05 ?? ?? ?? ??",  // AOB 模式
     shellcode,
-    2,
-);
+    2,                        // 覆盖字节数
+    0x10,                     // 偏移量
+)?;
 manager.register("func_hook", hook_handler);
 
 // 激活钩子
@@ -129,12 +205,12 @@ manager.activate("func_hook")?;
 manager.deactivate("func_hook")?;
 ```
 
-**传统直接API**（仍然支持但不推荐）：
+**传统直接 API**（仍支持，但不推荐）：
 
-```
+```rust
 use win_auto_utils::memory_hook::TrampolineHook;
 
-let shellcode = vec![0x90, 0x90]; // NOP指令
+let shellcode = vec![0x01, 0xD2]; // add edx, edx
 let mut hook = TrampolineHook::new_x86(handle, target_addr, shellcode);
 hook.install()?;
 // ... 触发钩子 ...
@@ -159,27 +235,13 @@ engine.execute(script)?;
 
 ## 📚 文档
 
-提供完整的中英文文档：
+提供中英文综合文档：
 
 ### 快速链接
-- **[Documentation Index (EN)](docs/en/INDEX.md)** - 完整导航指南
 - **[文档索引 (中文)](docs/zh/INDEX.md)** - 完整导航指南
+- **[Documentation Index (EN)](docs/en/INDEX.md)** - Complete navigation guide
 
 ### 模块文档
-
-#### 英文 (English)
-- [Modules Overview](docs/en/modules/overview.md) - 所有模块的高层视图
-- [Memory Operations](docs/en/modules/memory.md)
-- [Memory Manager](docs/en/modules/memory_manager.md) - 统一的内存修改管理器
-- [Memory Hooking](docs/en/modules/memory_hook.md)
-- [Address Resolution](docs/en/modules/memory_resolver.md)
-- [AOB Scanning](docs/en/modules/memory_aobscan.md)
-- [Script Engine](docs/en/modules/script_engine.md)
-- [Input Control](docs/en/modules/input.md)
-- [Process & Window](docs/en/modules/process_window.md)
-- [Screen Capture](docs/en/modules/dxgi.md)
-- [Template Matching](docs/en/modules/template_matcher.md)
-- [DLL Injection](docs/en/modules/dll_injector.md)
 
 #### 中文
 - [模块概览](docs/zh/modules/overview.md) - 所有模块的高层视图
@@ -195,9 +257,23 @@ engine.execute(script)?;
 - [模板匹配](docs/zh/modules/template_matcher.md)
 - [DLL注入](docs/zh/modules/dll_injector.md)
 
-## 🏗️ 架构设计
+#### English
+- [Modules Overview](docs/en/modules/overview.md) - High-level view of all modules
+- [Memory Operations](docs/en/modules/memory.md)
+- [Memory Manager](docs/en/modules/memory_manager.md) - Unified memory modification manager
+- [Memory Hooking](docs/en/modules/memory_hook.md)
+- [Address Resolution](docs/en/modules/memory_resolver.md)
+- [AOB Scanning](docs/en/modules/memory_aobscan.md)
+- [Script Engine](docs/en/modules/script_engine.md)
+- [Input Control](docs/en/modules/input.md)
+- [Process & Window](docs/en/modules/process_window.md)
+- [Screen Capture](docs/en/modules/dxgi.md)
+- [Template Matching](docs/en/modules/template_matcher.md)
+- [DLL Injection](docs/en/modules/dll_injector.md)
 
-库采用模块化架构，通过 feature-gated 组件实现解耦：
+## 🏗️ 架构
+
+库采用模块化架构，特性门控：
 
 ```
 win-auto-utils/
@@ -217,8 +293,8 @@ win-auto-utils/
 │   └── color_finder - 像素颜色搜索
 │
 ├── 内存层
-│   ├── memory       - 基础读写
-│   ├── memory_resolver - 符号地址解析
+│   ├── memory       - 基本读写
+│   ├── memory_resolver - 符号地址
 │   ├── memory_aobscan  - 模式扫描
 │   └── memory_hook     - 内联/蹦床钩子
 │
@@ -228,61 +304,117 @@ win-auto-utils/
 │
 └── 脚本引擎
     ├── script_engine      - 核心解释器
-    └── scripts_builtin    - 内置指令集
+    └── scripts_builtin    - 内置指令
 ```
 
-## 🔧 Feature Flags
+## 🔧 特性标志
 
-按需选择所需功能：
+按需选择：
 
-### 最小化配置 (~15秒编译)
+### 最小配置（约 15s 编译）
 ```bash
 cargo build --no-default-features --features "keyboard,mouse"
 ```
 
 ### 核心功能（默认）
 ```bash
-cargo build  # 包含所有稳定功能（除 template_matcher）
+cargo build  # 包含除 template_matcher 外的所有稳定功能
 ```
 
-### 完整功能 (~45-60秒编译)
+### 完整功能（约 45-60s 编译）
 ```bash
 cargo build --no-default-features --features "full"
 ```
 
-### 可用 Features
+### 可用特性
 
-| Feature | 描述 | 依赖 |
-|---------|------|------|
+| 特性 | 描述 | 依赖 |
+|---------|-------------|--------------|
 | `process` | 进程管理 | windows, hwnd, hdc, snapshot, handle |
 | `keyboard` | 键盘输入 | windows |
 | `mouse` | 鼠标控制 | windows |
+| `color_picker` | GDI 颜色拾取 | windows |
+| `color_finder` | 像素颜色搜索 (AVX2/SIMD) | dxgi |
 | `memory` | 内存读写 | windows |
 | `memory_hook` | 钩子系统 | memory, windows |
 | `memory_aobscan` | 模式扫描 | memory, memchr, rayon |
 | `dxgi` | 屏幕捕获 | windows |
 | `template_matcher` | 图像匹配 | image, imageproc, rayon |
-| `script_engine` | 脚本解释器 | (无，纯 Rust) |
+| `script_engine` | 脚本解释器 | （无，纯 Rust） |
 | `dll_injector` | DLL 注入 | snapshot, windows |
 
-完整功能列表参见 [Cargo.toml](Cargo.toml)。
+完整的特性列表参见 [Cargo.toml](Cargo.toml)。
 
-## 📖 示例代码
+## 📖 示例
 
-查看 `examples/` 目录了解使用演示：
+参考 `examples/` 目录下的使用演示：
+
+### 内存管理器示例
 
 ```bash
-# 运行脚本引擎示例
-cargo run --example script_engine --features "script_engine"
+# 通用内存管理器用法
+cargo run --example memory_manager_example --features "memory_manager"
+```
 
-# 运行 DXGI 捕获示例
+### 进程与窗口管理
+
+```bash
+# 进程管理器示例
+cargo run --example process_manager_example --features "process"
+
+# 自定义初始化标志
+cargo run --example custom_init_flags --features "process"
+
+# 窗口激活指令
+cargo run --example active_instruction --features "scripts_window"
+```
+
+### 屏幕捕获
+
+```bash
+# DXGI 捕获示例
 cargo run --example dxgi_capture --features "dxgi"
 
-# 运行内存钩子示例
-cargo run --example memory_hook_reset --features "memory_hook"
+# 性能对比
+cargo run --example dxgi_performance_comparison --features "dxgi"
+```
 
-# 运行 AOB 扫描基准测试
-cargo run --example aobscan_benchmark --features "memory_aobscan"
+### 脚本引擎
+
+```bash
+# 带内置指令的脚本引擎
+cargo run --example script_engine --features "script_engine,scripts_builtin"
+```
+
+### 颜色操作
+
+```bash
+# 颜色转换工具
+cargo run --example color_conversion --features "color_picker"
+
+# 颜色查找器重导出
+cargo run --example color_reexports --features "color_finder"
+```
+
+### 剪贴板
+
+```bash
+# 剪贴板用法示例
+cargo run --example clipboard_usage --features "clipboard"
+```
+
+### 字节扫描
+
+```bash
+# 64 位字节码 AOB 扫描
+cargo run --example aobscan_64bit_bytecode --features "memory_aobscan"
+```
+
+### DLL 注入
+
+```bash
+# DLL 注入示例
+cargo run --example dll_injection --features "dll_injector"
 ```
 
 ## 🧪 测试
@@ -299,21 +431,3 @@ cargo test --features "scripts_builtin"
 # 测试内存操作
 cargo test --features "memory"
 ```
-
-## 🤝 贡献
-
-欢迎贡献！请随时提交 Pull Request。
-
-## 📄 许可证
-
-本项目采用 MIT 许可证 - 详见 LICENSE 文件。
-
-## 🙏 致谢
-
-- Windows API 绑定来自 [microsoft/windows-rs](https://github.com/microsoft/windows-rs)
-- 模板匹配算法来自 [image-rs/imageproc](https://github.com/image-rs/imageproc)
-- 社区反馈与测试支持
-
----
-
-**语言**: [English](../README.md) | [中文](README.md)

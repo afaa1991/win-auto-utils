@@ -6,9 +6,9 @@
 
 ## Feature Flag
 
-``toml
+```toml
 [dependencies]
-win-auto-utils = { version = "0.2.0", features = ["process"] }
+win-auto-utils = { version = "0.2.3", features = ["process"] }
 ```
 
 ## 快速开始

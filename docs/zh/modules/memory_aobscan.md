@@ -8,7 +8,7 @@
 
 ```
 [dependencies]
-win-auto-utils = { version = "0.1.0", features = ["memory_aobscan"] }
+win-auto-utils = { version = "0.2.3", features = ["memory_aobscan"] }
 ```
 
 ## 快速开始

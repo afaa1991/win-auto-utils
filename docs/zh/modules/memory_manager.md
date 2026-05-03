@@ -60,7 +60,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     manager.set_context(handle, pid);
     
     // 3. 注册内存锁定功能
-    let value_lock = LockHandler::new_lock_x86_typed(
+    let value_lock = LockHandler::new_lock(
         "value_lock",
         "target_app.exe+0x12345",
         100i32,
@@ -165,7 +165,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     manager.set_context(handle, pid);
     
     // 注册多个功能
-    let value_lock = LockHandler::new_lock_x86_typed(
+    let value_lock = LockHandler::new_lock(
         "value_lock",
         "target_app.exe+0x1000",
         100i32,
@@ -173,7 +173,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     )?;
     manager.register("value_lock", value_lock);
     
-    let nop_patch = BytesSwitchHandler::new_nop_switch_x86(
+    let nop_patch = BytesSwitchHandler::new_nop_switch(
         "nop_patch",
         "target_app.exe+0x2000",
         2,
@@ -181,12 +181,12 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     manager.register("nop_patch", nop_patch);
     
     let shellcode = vec![0x90, 0x90]; // NOP指令
-    let func_hook = TrampolineHookHandler::new_x86_skip_trampoline(
+    let func_hook = TrampolineHookHandler::new_hook_aob(
         "func_hook",
-        AddressSource::from_pattern_x86("target_app.exe+0x3000")?,
+        "48 89 5C 24",  // AOB pattern for function prologue
         shellcode,
         2,
-    );
+    )?;
     manager.register("func_hook", func_hook);
     
     // 逐个测试功能
@@ -236,7 +236,6 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
 **构造函数：**
 - `new_lock(name, address_pattern, value, interval)` - 静态地址，自动检测架构
-- `new_lock_aob(name, pattern, value, interval)` - AOB模式扫描
 
 **示例：**
 ```rust
@@ -384,7 +383,12 @@ manager.activate_all()?;
 A: 是的，随时可以注册新的修改器：
 
 ```rust
-let new_handler = LockHandler::new_lock_x86_typed(...)?;
+let new_handler = LockHandler::new_lock(
+    "new_feature",
+    "target_app.exe+0x5000",
+    999i32,
+    Duration::from_millis(100),
+)?;
 manager.register("new_feature", new_handler);
 manager.activate("new_feature")?;
 ```

@@ -8,7 +8,7 @@ The `input` module provides comprehensive keyboard and mouse control through two
 
 ```toml
 [dependencies]
-win-auto-utils = { version = "0.1.0", features = ["keyboard", "mouse"] }
+win-auto-utils = { version = "0.2.3", features = ["keyboard", "mouse"] }
 ```
 
 ## Quick Start

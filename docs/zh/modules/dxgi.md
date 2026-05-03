@@ -8,7 +8,7 @@
 
 ```toml
 [dependencies]
-win-auto-utils = { version = "0.1.0", features = ["dxgi"] }
+win-auto-utils = { version = "0.2.3", features = ["dxgi"] }
 ```
 
 **平台**: 仅 Windows（需要 DirectX 11+）
@@ -18,15 +18,15 @@ win-auto-utils = { version = "0.1.0", features = ["dxgi"] }
 ### 基础屏幕捕获
 
 ```rust
-use win_auto_utils::dxgi::DxgiCapture;
+use win_auto_utils::dxgi::{capture_region_bytes, get_screen_size};
 
-// 创建捕获实例
-let mut capture = DxgiCapture::new()?;
+// 获取屏幕尺寸
+let (width, height) = get_screen_size()?;
+println!("屏幕分辨率: {}x{}", width, height);
 
-// 捕获全屏
-let frame = capture.capture_frame()?;
-println!("帧大小: {}x{}", frame.width, frame.height);
-println!("数据长度: {} 字节", frame.data.len());
+// 捕获全屏（使用大区域）
+let bytes = capture_region_bytes(0, 0, width as i32, height as i32)?;
+println!("数据长度: {} 字节", bytes.len());
 
 // 帧数据采用 BGRA 格式（每像素 4 字节）
 ```
@@ -34,13 +34,11 @@ println!("数据长度: {} 字节", frame.data.len());
 ### 捕获特定区域
 
 ```rust
-use win_auto_utils::dxgi::DxgiCapture;
-
-let mut capture = DxgiCapture::new()?;
+use win_auto_utils::dxgi::capture_region_bytes;
 
 // 在位置 (100, 50) 捕获 200x100 的区域
-let region = capture.capture_region(100, 50, 200, 100)?;
-println!("区域已捕获: {}x{}", region.width, region.height);
+let bytes = capture_region_bytes(100, 50, 200, 100)?;
+println!("区域已捕获: {} 字节", bytes.len());
 ```
 
 ## 核心功能
@@ -57,18 +55,17 @@ println!("区域已捕获: {}x{}", region.width, region.height);
 ### 示例 1: 连续帧捕获
 
 ```rust
-use win_auto_utils::dxgi::DxgiCapture;
+use win_auto_utils::dxgi::capture_region_bytes;
 use std::time::Instant;
-
-let mut capture = DxgiCapture::new()?;
 
 // 捕获 100 帧并测量性能
 let start = Instant::now();
+
 for i in 0..100 {
-    let frame = capture.capture_frame()?;
-    
+    let bytes = capture_region_bytes(0, 0, 1920, 1080)?;
+
     if i % 10 == 0 {
-        println!("帧 {}: {}x{}", i, frame.width, frame.height);
+        println!("帧 {}: {} 字节", i, bytes.len());
     }
 }
 
@@ -80,9 +77,7 @@ println!("平均 FPS: {:.2}", fps);
 ### 示例 2: 基于区域的监控
 
 ```rust
-use win_auto_utils::dxgi::DxgiCapture;
-
-let mut capture = DxgiCapture::new()?;
+use win_auto_utils::dxgi::capture_region_bytes;
 
 // 监控特定的 UI 元素（如生命条）
 let health_bar_x = 100;
@@ -91,16 +86,15 @@ let health_bar_width = 200;
 let health_bar_height = 20;
 
 loop {
-    let region = capture.capture_region(
+    let bytes = capture_region_bytes(
         health_bar_x,
         health_bar_y,
         health_bar_width,
         health_bar_height,
     )?;
-    
+
     // 处理区域数据（例如颜色分析）
-    analyze_health_bar(&region.data);
-    
+
     std::thread::sleep(std::time::Duration::from_millis(16)); // ~60 FPS
 }
 ```
@@ -108,23 +102,16 @@ loop {
 ### 示例 3: 错误处理和恢复
 
 ```rust
-use win_auto_utils::dxgi::{DxgiCapture, DxgiError};
+use win_auto_utils::dxgi::{capture_region_bytes, DxgiError};
 
 fn capture_with_recovery() -> Result<(), Box<dyn std::error::Error>> {
-    let mut capture = DxgiCapture::new()?;
-    
     loop {
-        match capture.capture_frame() {
-            Ok(frame) => {
-                process_frame(&frame);
+        match capture_region_bytes(0, 0, 1920, 1080) {
+            Ok(bytes) => {
+                process_bytes(&bytes);
             }
             Err(DxgiError::CaptureFailed(msg)) => {
                 eprintln!("捕获失败: {}", msg);
-                
-                // 尝试重新初始化
-                eprintln!("重新初始化...");
-                capture = DxgiCapture::new()?;
-                
                 std::thread::sleep(std::time::Duration::from_secs(1));
             }
             Err(e) => {
@@ -138,30 +125,23 @@ fn capture_with_recovery() -> Result<(), Box<dyn std::error::Error>> {
 ### 示例 4: 多显示器支持
 
 ```rust
-use win_auto_utils::dxgi::DxgiCapture;
+use win_auto_utils::dxgi::get_screen_size;
 
-// 默认捕获主显示器
-let mut capture = DxgiCapture::new()?;
-
-// 获取屏幕尺寸
-let width = capture.get_width();
-let height = capture.get_height();
+// 获取主屏幕尺寸
+let (width, height) = get_screen_size()?;
 
 println!("主显示器: {}x{}", width, height);
 
-// 要捕获特定显示器，修改源代码以选择适配器/输出
+// 要捕获特定显示器，需要使用底层 API
 ```
 
 ### 示例 5: 帧处理管道
 
 ```rust
-use win_auto_utils::dxgi::DxgiCapture;
-
-let mut capture = DxgiCapture::new()?;
+use win_auto_utils::dxgi::capture_region_bytes;
 
 // 捕获并转换为 RGB
-let frame = capture.capture_frame()?;
-let bgra_data = &frame.data;
+let bgra_data = capture_region_bytes(0, 0, 1920, 1080)?;
 
 // 将 BGRA 转换为 RGB（跳过 alpha 通道）
 let mut rgb_data = Vec::with_capacity(bgra_data.len() * 3 / 4);
@@ -178,22 +158,20 @@ println!("RGB 数据大小: {} 字节", rgb_data.len());
 ### 示例 6: 性能基准测试
 
 ```rust
-use win_auto_utils::dxgi::DxgiCapture;
+use win_auto_utils::dxgi::capture_region_bytes;
 use std::time::Instant;
-
-let mut capture = DxgiCapture::new()?;
 
 // 预热
 for _ in 0..10 {
-    let _ = capture.capture_frame()?;
+    let _ = capture_region_bytes(0, 0, 100, 100)?;
 }
 
 // 基准测试
-let iterations = 1000;
+let iterations = 100;
 let start = Instant::now();
 
 for _ in 0..iterations {
-    let _ = capture.capture_frame()?;
+    let _ = capture_region_bytes(0, 0, 100, 100)?;
 }
 
 let elapsed = start.elapsed();
@@ -206,32 +184,22 @@ println!("达到的 FPS: {:.2}", fps);
 
 ## API 参考
 
+### 主要函数
+
+DXGI 模块提供直接的函数式 API：
+
+#### 捕获函数
+
+- **`capture_region_bytes(x, y, width, height) -> Result<Vec<u8>, DxgiError>`**
+  - 捕获指定区域的屏幕截图
+  - 返回 BGRA 格式的字节数据
+  - x, y 为起始坐标，width, height 为区域尺寸
+
+- **`get_screen_size() -> Result<(i32, i32), DxgiError>`**
+  - 获取主屏幕的尺寸
+  - 返回 (宽度, 高度) 元组
+
 ### 主要类型
-
-#### DxgiCapture
-
-DXGI 屏幕捕获的主要结构体。
-
-**构造函数**:
-- `DxgiCapture::new() -> Result<Self, DxgiError>` - 创建新的捕获实例
-
-**方法**:
-- `capture_frame() -> Result<CapturedFrame, DxgiError>` - 捕获全屏
-- `capture_region(x, y, w, h) -> Result<CapturedFrame, DxgiError>` - 捕获特定区域
-- `get_width() -> usize` - 获取屏幕宽度
-- `get_height() -> usize` - 获取屏幕高度
-
-#### CapturedFrame
-
-表示捕获的帧。
-
-**字段**:
-- `data: Vec<u8>` - BGRA 格式的像素数据（每像素 4 字节）
-- `width: usize` - 帧宽度（像素）
-- `height: usize` - 帧高度（像素）
-
-**方法**:
-- `get_pixel(x, y) -> Option<(u8, u8, u8, u8)>` - 获取像素颜色（B, G, R, A）
 
 #### DxgiError
 
@@ -272,37 +240,31 @@ DXGI 操作的错误类型。
 
 ## 最佳实践
 
-1. **重用捕获实例**
+1. **直接使用捕获函数**
    ```rust
-   // 好: 重用实例
+   // 好：直接调用函数
+   let bytes = capture_region_bytes(100, 50, 200, 100)?;
+
+   // 不好：每次都重新初始化
    let mut capture = DxgiCapture::new()?;
-   for _ in 0..1000 {
-       let frame = capture.capture_frame()?;
-   }
-   
-   // 不好: 每次都创建新实例
-   for _ in 0..1000 {
-       let capture = DxgiCapture::new()?;  // 慢！
-       let frame = capture.capture_frame()?;
-   }
    ```
 
 2. **仅捕获需要的区域**
    ```rust
-   // 好: 小区域
-   let region = capture.capture_region(100, 50, 200, 100)?;
-   
-   // 不好: 只需要小区域时捕获全屏
-   let frame = capture.capture_frame()?;  // 浪费资源
+   // 好：小区域
+   let bytes = capture_region_bytes(100, 50, 200, 100)?;
+
+   // 不好：只需要小区域时捕获全屏
+   let bytes = capture_region_bytes(0, 0, 1920, 1080)?; // 浪费资源
    ```
 
 3. **优雅地处理错误**
    ```rust
-   match capture.capture_frame() {
-       Ok(frame) => process(frame),
+   match capture_region_bytes(0, 0, 1920, 1080) {
+       Ok(bytes) => process_bytes(&bytes),
        Err(DxgiError::CaptureFailed(_)) => {
-           // 访问丢失时重新初始化
-           capture = DxgiCapture::new()?;
+           // 访问丢失时重试
+           std::thread::sleep(std::time::Duration::from_secs(1));
        }
        Err(e) => return Err(e),
    }
@@ -312,7 +274,7 @@ DXGI 操作的错误类型。
    ```rust
    // 对于 UI 监控: 10-30 FPS 足够
    std::thread::sleep(Duration::from_millis(33)); // 30 FPS
-   
+
    // 对于游戏: 可能需要 60+ FPS
    std::thread::sleep(Duration::from_millis(16)); // 60 FPS
    ```
@@ -320,8 +282,8 @@ DXGI 操作的错误类型。
 5. **高效处理帧**
    ```rust
    // 避免复制大向量
-   let frame = capture.capture_frame()?;
-   process_in_place(&frame.data);  // 借用而非克隆
+   let bytes = capture_region_bytes(0, 0, 1920, 1080)?;
+   process_in_place(&bytes);  // 借用而非克隆
    ```
 
 ## 常见陷阱
@@ -329,43 +291,44 @@ DXGI 操作的错误类型。
 ### ❌ 不处理访问丢失
 
 ```rust
-// 错误: 显示模式改变时崩溃
-let frame = capture.capture_frame()?;
+// 错误：显示模式改变时可能失败
+let bytes = capture_region_bytes(0, 0, 1920, 1080)?;
 
-// 正确: 处理并恢复
-match capture.capture_frame() {
-    Ok(frame) => use_frame(frame),
-    Err(DxgiError::CaptureFailed(msg)) if msg.contains("Access lost") => {
-        capture = DxgiCapture::new()?;  // 重新初始化
+// 正确：处理并重试
+loop {
+    match capture_region_bytes(0, 0, 1920, 1080) {
+        Ok(bytes) => break,
+        Err(DxgiError::CaptureFailed(_)) => {
+            std::thread::sleep(std::time::Duration::from_secs(1));
+        }
+        Err(e) => return Err(e),
     }
-    Err(e) => return Err(e),
 }
 ```
 
 ### ❌ 捕获越界区域
 
 ```rust
-// 错误: 可能 panic 或返回错误
-let region = capture.capture_region(10000, 10000, 200, 100)?;
+// 错误：可能 panic 或返回错误
+let bytes = capture_region_bytes(10000, 10000, 200, 100)?;
 
-// 正确: 先检查边界
-let width = capture.get_width();
-let height = capture.get_height();
+// 正确：先检查边界
+let (width, height) = get_screen_size()?;
 if x + w <= width && y + h <= height {
-    let region = capture.capture_region(x, y, w, h)?;
+    let bytes = capture_region_bytes(x, y, w, h)?;
 }
 ```
 
-### ❌ 阻塞捕获线程
+### ❌ 阻塞捕获
 
 ```rust
-// 错误: 繁重的处理阻塞下一次捕获
-let frame = capture.capture_frame()?;
-heavy_image_processing(&frame);  // 耗时 100ms - 降低 FPS
+// 错误：繁重的处理阻塞下一次捕获
+let bytes = capture_region_bytes(0, 0, 1920, 1080)?;
+heavy_image_processing(&bytes);  // 耗时 100ms - 降低 FPS
 
-// 正确: 使用单独的线程或队列
-let frame = capture.capture_frame()?;
-tx.send(frame)?;  // 发送到工作线程
+// 正确：使用单独的线程或队列
+let bytes = capture_region_bytes(0, 0, 1920, 1080)?;
+tx.send(bytes)?;  // 发送到工作线程
 ```
 
 ## 平台要求

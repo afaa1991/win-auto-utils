@@ -8,7 +8,7 @@
 
 ```toml
 [dependencies]
-win-auto-utils = { version = "0.1.0", features = ["script_engine"] }
+win-auto-utils = { version = "0.2.3", features = ["script_engine"] }
 ```
 
 **平台**: 跨平台（纯 Rust 实现）
@@ -20,36 +20,38 @@ win-auto-utils = { version = "0.1.0", features = ["script_engine"] }
 ```rust
 use win_auto_utils::script_engine::ScriptEngine;
 
-let mut engine = ScriptEngine::new();
+// 创建内置指令的引擎
+let engine = ScriptEngine::with_builtin();
 
 // 执行简单脚本
-engine.execute_script(r#"
-    click "a"
-    sleep 100
-    click "b"
+engine.compile_and_execute(r#"
+    sleep 10
 "#)?;
 
 println!("脚本执行成功！");
 ```
 
-### 带变量和循环的脚本
+### 带内置指令的脚本
 
 ```rust
-use win_auto_utils::script_engine::ScriptEngine;
+use win_auto_utils::script_engine::{InstructionRegistry, ScriptConfig, ScriptEngine};
 
-let mut engine = ScriptEngine::new();
+// 创建自定义注册表并注册一些指令
+let mut registry = InstructionRegistry::new();
+
+// 使用辅助函数注册所有内置指令
+win_auto_utils::scripts_builtin::register_all(&mut registry);
+
+let engine = ScriptEngine::with_registry_and_config(registry, ScriptConfig::default());
 
 // 带循环和变量的脚本
 let script = r#"
-    set $counter 5
-    loop $counter {
-        click "x"
+    loop 3 {
         sleep 50
-        dec $counter
     }
 "#;
 
-engine.execute_script(script)?;
+engine.compile_and_execute(script)?;
 println!("循环完成！");
 ```
 
@@ -71,19 +73,16 @@ println!("循环完成！");
 ```rust
 use win_auto_utils::script_engine::ScriptEngine;
 
-let mut engine = ScriptEngine::new();
+let engine = ScriptEngine::with_builtin();
 
 // 带条件分支的脚本
 let script = r#"
-    set $health 100
-    if $health > 50 {
-        click "potion"
-    } else {
-        click "retreat"
-    }
+    loop 3
+        sleep 100
+    end
 "#;
 
-engine.execute_script(script)?;
+engine.compile_and_execute(script)?;
 ```
 
 ### 示例 2: 嵌套循环
@@ -91,103 +90,87 @@ engine.execute_script(script)?;
 ```rust
 use win_auto_utils::script_engine::ScriptEngine;
 
-let mut engine = ScriptEngine::new();
+let engine = ScriptEngine::with_builtin();
 
-// 网格模式的嵌套循环
+// 嵌套循环
 let script = r#"
-    set $row 3
-    set $col 4
-    
-    loop $row {
-        loop $col {
-            click "cell"
+    loop 2
+        loop 3
             sleep 10
-        }
-        move_down
-    }
+        end
+    end
 "#;
 
-engine.execute_script(script)?;
+engine.compile_and_execute(script)?;
 ```
 
 ### 示例 3: 中断控制
 
 ```rust
-use win_auto_utils::script_engine::{ScriptEngine, InterruptController};
+use win_auto_utils::script_engine::ScriptEngine;
 
-let mut engine = ScriptEngine::new();
-let controller = engine.get_interrupt_controller();
+let engine = ScriptEngine::with_builtin();
 
 // 在后台启动脚本
-engine.execute_script_async(r#"
+engine.compile_and_execute_async(r#"
     loop 100 {
-        click "a"
         sleep 100
     }
 "#)?;
 
-// 2秒后暂停
+// 2秒后暂停（需要保存 controller 引用）
 std::thread::sleep(std::time::Duration::from_secs(2));
-controller.pause()?;
+// controller.pause()?;
 
 // 稍后恢复
-controller.resume()?;
+// controller.resume()?;
 
 // 或完全停止
-controller.stop()?;
+// controller.stop()?;
 ```
 
 ### 示例 4: 自定义配置
 
 ```rust
-use win_auto_utils::script_engine::{ScriptEngine, ScriptConfig};
+use win_auto_utils::script_engine::{InstructionRegistry, ScriptConfig, ScriptEngine};
 
-let config = ScriptConfig {
-    max_loop_iterations: 10000,
-    enable_debug_logging: true,
-    timeout_ms: Some(30000), // 30秒超时
-};
+let config = ScriptConfig::default();
 
-let mut engine = ScriptEngine::with_config(config);
-engine.execute_script(your_script)?;
+let mut registry = InstructionRegistry::new();
+win_auto_utils::scripts_builtin::register_all(&mut registry);
+
+let engine = ScriptEngine::with_registry_and_config(registry, config);
+engine.compile_and_execute(your_script)?;
 ```
 
 ### 示例 5: 错误处理
 
 ```rust
-use win_auto_utils::script_engine::{ScriptEngine, ScriptError};
+use win_auto_utils::script_engine::ScriptEngine;
 
-let mut engine = ScriptEngine::new();
+let engine = ScriptEngine::with_builtin();
 
-match engine.execute_script("invalid syntax here") {
+match engine.compile_and_execute("sleep 10") {
     Ok(_) => println!("成功"),
-    Err(ScriptError::ParseError { line, message }) => {
-        eprintln!("第 {} 行解析错误: {}", line, message);
-    }
-    Err(ScriptError::RuntimeError { instruction, message }) => {
-        eprintln!("指令 '{}' 运行时错误: {}", instruction, message);
-    }
     Err(e) => eprintln!("错误: {}", e),
 }
 ```
 
-### 示例 6: 寄存器操作
+### 示例 6: 简单循环
 
 ```rust
 use win_auto_utils::script_engine::ScriptEngine;
 
-let mut engine = ScriptEngine::new();
+let engine = ScriptEngine::with_builtin();
 
-// 使用寄存器进行计算
+// 使用循环进行重复操作
 let script = r#"
-    set $x 10
-    set $y 20
-    add $x $y      # $x = 30
-    mul $x 2       # $x = 60
-    click_at $x $y # 点击位置 (60, 20)
+    loop 5
+        sleep 10
+    end
 "#;
 
-engine.execute_script(script)?;
+engine.compile_and_execute(script)?;
 ```
 
 ## API 参考
@@ -199,18 +182,18 @@ engine.execute_script(script)?;
 脚本执行的主要入口点。
 
 **构造函数**:
-- `ScriptEngine::new()` - 使用默认配置创建
-- `ScriptEngine::with_config(config: ScriptConfig)` - 使用自定义配置创建
+- `ScriptEngine::with_builtin()` - 创建带有内置指令的引擎
+- `ScriptEngine::with_registry_and_config(registry, config)` - 使用自定义注册表和配置创建
 
 **方法**:
-- `execute_script(script: &str) -> Result<(), ScriptError>` - 同步执行脚本
-- `execute_script_async(script: &str) -> Result<(), ScriptError>` - 在后台线程执行
+- `compile_and_execute(script: &str) -> Result<(), ScriptError>` - 同步编译并执行脚本
+- `compile_and_execute_async(script: &str) -> Result<(), ScriptError>` - 在后台线程编译并执行
 - `get_interrupt_controller() -> InterruptController` - 获取控制句柄
 - `get_vm_context() -> VMContext` - 访问 VM 状态
 
 #### ScriptConfig
 
-脚本引擎行为的配置。
+脚本引擎行为的配置（使用默认配置通常足够）。
 
 **字段**:
 - `max_loop_iterations: u64` - 最大循环迭代次数（防止无限循环）
@@ -241,84 +224,66 @@ engine.execute_script(script)?;
 
 ### 内置指令
 
+内置指令是通过 `ScriptEngine::with_builtin()` 自动可用的简化指令集。
+
 #### 控制流
 
 | 指令 | 语法 | 描述 |
 |------|------|------|
-| `set` | `set $var value` | 设置变量/寄存器 |
-| `if` | `if $var > 10 { ... }` | 条件分支 |
-| `loop` | `loop $count { ... }` | 重复 N 次 |
-| `while` | `while $var > 0 { ... }` | 当条件为真时循环 |
-| `jump` | `jump label_name` | 无条件跳转 |
-| `label` | `label my_label:` | 定义跳转目标 |
+| `loop` | `loop N { ... }` 或 `loop N ... end` | 重复 N 次 |
+| `time` | `time MS { ... }` 或 `time MS ... end` | 在时间限制内循环 |
+| `sleep` | `sleep MS` | 等待毫秒数 |
+| `continue` | `continue` | 跳过当前循环剩余迭代 |
+| `break` | `break` | 退出当前循环 |
 
-#### 算术运算
+#### 指令组合示例
 
-| 指令 | 语法 | 描述 |
-|------|------|------|
-| `add` | `add $a $b` | 加法 ($a += $b) |
-| `sub` | `sub $a $b` | 减法 ($a -= $b) |
-| `mul` | `mul $a $b` | 乘法 ($a *= $b) |
-| `div` | `div $a $b` | 除法 ($a /= $b) |
-| `inc` | `inc $var` | 递增 1 |
-| `dec` | `dec $var` | 递减 1 |
+```rust
+// 简单循环
+loop 3
+    sleep 100
+end
 
-#### 键盘/鼠标
+// 时间限制循环
+time 500
+    sleep 100
+end
 
-| 指令 | 语法 | 描述 |
-|------|------|------|
-| `click` | `click "key"` | 按下并释放键 |
-| `press` | `press "key"` | 按下键（保持） |
-| `release` | `release "key"` | 释放键 |
-| `move_to` | `move_to x y` | 移动鼠标到坐标 |
-| `click_at` | `click_at x y` | 在位置点击 |
-| `sleep` | `sleep ms` | 等待毫秒数 |
+// 带 continue 和 break
+loop 10
+    sleep 50
+    continue    // 跳过后面的代码
+    sleep 100   // 这行不会执行
+end
+```
 
 ## 脚本语法
 
-### 变量和寄存器
+### 基础语法
 
-变量以 `$` 为前缀并存储在 VM 寄存器中。
+脚本使用简单的指令序列：
 
 ```rust
-set $health 100
-set $name "player"
-set $position_x 500
+sleep 100        // 等待 100 毫秒
+loop 5           // 重复 5 次
+    sleep 50
+end
 ```
 
-### 注释
+### 时间限制循环
 
-单行注释以 `#` 开头。
-
-```rust
-set $x 10  # 这是注释
-# 整行注释
-```
-
-### 代码块
-
-代码块使用花括号 `{ }`。
+`time` 指令创建一个在指定时间内运行的循环：
 
 ```rust
-if $health > 50 {
-    click "heal"
+time 500         // 运行最多 500 毫秒
     sleep 100
-}
+end              // 约执行 5 次
 ```
 
-### 运算符
+### 循环控制
 
-支持的比较运算符：`>`、`<`、`>=`、`<=`、`==`、`!=`
-
-```rust
-if $health >= 100 {
-    # 满血
-} else if $health > 50 {
-    # 中等血量
-} else {
-    # 低血量
-}
-```
+- `continue` - 跳过当前迭代的剩余指令
+- `break` - 立即退出循环
 
 ## 架构细节
 
@@ -371,127 +336,116 @@ VM 使用命名寄存器而非栈：
 
 ## 最佳实践
 
-1. **使用有意义的变量名**
+1. **使用 `with_builtin()` 创建引擎**
    ```rust
-   # 好
-   set $player_health 100
-   set $enemy_count 5
-   
-   # 不好
-   set $a 100
-   set $b 5
+   // 推荐：使用内置指令
+   let engine = ScriptEngine::with_builtin();
+
+   // 或自定义注册表
+   let mut registry = InstructionRegistry::new();
+   win_auto_utils::scripts_builtin::register_all(&mut registry);
+   let engine = ScriptEngine::with_registry_and_config(registry, ScriptConfig::default());
    ```
 
-2. **为复杂逻辑添加注释**
+2. **使用 `compile_and_execute()` 执行脚本**
    ```rust
-   # 当血量低于 30% 时治疗
-   if $health < 30 {
-       click "health_potion"
-       sleep 500  # 等待动画
-   }
+   // 好：编译并执行
+   engine.compile_and_execute("sleep 100\n    continue\n    sleep 100\nend")?;
+
+   // 旧 API（已弃用）
+   // engine.execute_script(...);
    ```
 
 3. **设置合理的循环限制**
    ```rust
-   # 好: 有限循环
+   // 好：有限循环
    loop 100 {
-       click "farm"
-   }
-   
-   # 不好: 潜在无限循环
-   while $true {
-       click "action"
+       sleep 10
    }
    ```
 
-4. **优雅地处理错误**
+4. **使用 time 指令进行超时控制**
    ```rust
-   match engine.execute_script(script) {
-       Ok(_) => log_success(),
-       Err(ScriptError::ParseError { line, .. }) => {
-           eprintln!("修复第 {} 行的语法", line);
-       }
-       Err(e) => log_error(e),
-   }
+   // 好：带超时
+   time 5000
+       sleep 100
+   end
    ```
 
-5. **对长脚本使用中断**
+5. **使用 continue 和 break 控制循环**
    ```rust
-   let controller = engine.get_interrupt_controller();
-   
-   // 允许用户停止
-   if user_pressed_stop() {
-       controller.stop()?;
-   }
+   loop 100
+       sleep 50
+       continue    // 跳到下次迭代
+       sleep 100   // 不会执行
+   end
    ```
 
 ## 常见陷阱
 
-### ❌ 忘记寄存器前缀
+### ❌ 使用花括号语法（新版不支持）
 
 ```rust
-# 错误
-set health 100
-if health > 50
+// 错误：使用花括号
+loop 3 {
+    sleep 100
+}
 
-# 正确
-set $health 100
-if $health > 50
+// 正确：使用 end 关键字
+loop 3
+    sleep 100
+end
 ```
 
-### ❌ 未闭合的代码块
+### ❌ 使用旧版 API
 
 ```rust
-# 错误: 缺少右花括号
-if $health > 50 {
-    click "heal"
+// 错误：旧版 API
+let engine = ScriptEngine::new();
+engine.execute_script("...");
 
-# 正确
-if $health > 50 {
-    click "heal"
-}
+// 正确：新版 API
+let engine = ScriptEngine::with_builtin();
+engine.compile_and_execute("...")?;
 ```
 
-### ❌ 无限循环
+### ❌ 忘记 end 关键字
 
 ```rust
-# 错误: 无终止条件
-loop 999999999 {
-    click "spam"
-}
+// 错误：缺少 end
+loop 3
+    sleep 100
+// 缺少 end
 
-# 正确: 合理限制
-loop 100 {
-    click "action"
-}
+// 正确：闭合代码块
+loop 3
+    sleep 100
+end
 ```
 
 ## 扩展引擎
 
-### 自定义指令处理器
+### 注册自定义指令
 
 ```rust
-use win_auto_utils::script_engine::{
-    InstructionHandler, InstructionData, VM
-};
+use win_auto_utils::script_engine::{Instruction, InstructionHandler, InstructionRegistry, VM};
 
-struct MyCustomInstruction;
+struct MyInstruction;
 
-impl InstructionHandler for MyCustomInstruction {
-    fn parse(&self, tokens: &[Token]) -> Result<InstructionData> {
-        // 解析自定义语法
-        Ok(InstructionData::new("my_instruction"))
+impl InstructionHandler for MyInstruction {
+    fn parse(&self, tokens: &[&str]) -> Result<Instruction, String> {
+        Ok(Instruction::new("my_instruction"))
     }
-    
-    fn execute(&self, vm: &mut VM, data: &InstructionData) {
-        // 自定义执行逻辑
+
+    fn execute(&self, _vm: &mut VM, _instruction: &Instruction) -> Result<(), String> {
         println!("执行自定义指令");
+        Ok(())
     }
 }
 
 // 注册到引擎
 let mut registry = InstructionRegistry::new();
-registry.register("my_instruction", Box::new(MyCustomInstruction));
+registry.register("my_instruction", Box::new(MyInstruction));
 ```
 
 ## 性能特征

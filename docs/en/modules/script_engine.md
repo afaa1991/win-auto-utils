@@ -8,7 +8,7 @@ The `script_engine` module provides a lightweight, extensible script execution e
 
 ```toml
 [dependencies]
-win-auto-utils = { version = "0.1.0", features = ["script_engine"] }
+win-auto-utils = { version = "0.2.3", features = ["script_engine"] }
 ```
 
 **Platform**: Cross-platform (pure Rust implementation)
@@ -20,36 +20,38 @@ win-auto-utils = { version = "0.1.0", features = ["script_engine"] }
 ```rust
 use win_auto_utils::script_engine::ScriptEngine;
 
-let mut engine = ScriptEngine::new();
+// Create engine with built-in instructions
+let engine = ScriptEngine::with_builtin();
 
 // Execute simple script
-engine.execute_script(r#"
-    click "a"
-    sleep 100
-    click "b"
+engine.compile_and_execute(r#"
+    sleep 10
 "#)?;
 
 println!("Script executed successfully!");
 ```
 
-### Script with Variables and Loops
+### Script with Built-in Instructions
 
 ```rust
-use win_auto_utils::script_engine::ScriptEngine;
+use win_auto_utils::script_engine::{InstructionRegistry, ScriptConfig, ScriptEngine};
 
-let mut engine = ScriptEngine::new();
+// Create a custom registry and register some instructions
+let mut registry = InstructionRegistry::new();
+
+// Use helper function to register all built-in instructions
+win_auto_utils::scripts_builtin::register_all(&mut registry);
+
+let engine = ScriptEngine::with_registry_and_config(registry, ScriptConfig::default());
 
 // Script with loop and variables
 let script = r#"
-    set $counter 5
-    loop $counter {
-        click "x"
+    loop 3 {
         sleep 50
-        dec $counter
     }
 "#;
 
-engine.execute_script(script)?;
+engine.compile_and_execute(script)?;
 println!("Loop completed!");
 ```
 
@@ -71,19 +73,16 @@ println!("Loop completed!");
 ```rust
 use win_auto_utils::script_engine::ScriptEngine;
 
-let mut engine = ScriptEngine::new();
+let engine = ScriptEngine::with_builtin();
 
 // Script with conditional branching
 let script = r#"
-    set $health 100
-    if $health > 50 {
-        click "potion"
-    } else {
-        click "retreat"
-    }
+    loop 3
+        sleep 100
+    end
 "#;
 
-engine.execute_script(script)?;
+engine.compile_and_execute(script)?;
 ```
 
 ### Example 2: Nested Loops
@@ -91,103 +90,87 @@ engine.execute_script(script)?;
 ```rust
 use win_auto_utils::script_engine::ScriptEngine;
 
-let mut engine = ScriptEngine::new();
+let engine = ScriptEngine::with_builtin();
 
-// Nested loops for grid pattern
+// Nested loops
 let script = r#"
-    set $row 3
-    set $col 4
-    
-    loop $row {
-        loop $col {
-            click "cell"
+    loop 2
+        loop 3
             sleep 10
-        }
-        move_down
-    }
+        end
+    end
 "#;
 
-engine.execute_script(script)?;
+engine.compile_and_execute(script)?;
 ```
 
 ### Example 3: Interrupt Control
 
 ```rust
-use win_auto_utils::script_engine::{ScriptEngine, InterruptController};
+use win_auto_utils::script_engine::ScriptEngine;
 
-let mut engine = ScriptEngine::new();
-let controller = engine.get_interrupt_controller();
+let engine = ScriptEngine::with_builtin();
 
 // Start script in background
-engine.execute_script_async(r#"
+engine.compile_and_execute_async(r#"
     loop 100 {
-        click "a"
         sleep 100
     }
 "#)?;
 
-// Pause after 2 seconds
+// Pause after 2 seconds (need to save controller reference)
 std::thread::sleep(std::time::Duration::from_secs(2));
-controller.pause()?;
+// controller.pause()?;
 
 // Resume later
-controller.resume()?;
+// controller.resume()?;
 
 // Or stop completely
-controller.stop()?;
+// controller.stop()?;
 ```
 
 ### Example 4: Custom Configuration
 
 ```rust
-use win_auto_utils::script_engine::{ScriptEngine, ScriptConfig};
+use win_auto_utils::script_engine::{InstructionRegistry, ScriptConfig, ScriptEngine};
 
-let config = ScriptConfig {
-    max_loop_iterations: 10000,
-    enable_debug_logging: true,
-    timeout_ms: Some(30000), // 30 second timeout
-};
+let config = ScriptConfig::default();
 
-let mut engine = ScriptEngine::with_config(config);
-engine.execute_script(your_script)?;
+let mut registry = InstructionRegistry::new();
+win_auto_utils::scripts_builtin::register_all(&mut registry);
+
+let engine = ScriptEngine::with_registry_and_config(registry, config);
+engine.compile_and_execute(your_script)?;
 ```
 
 ### Example 5: Error Handling
 
 ```rust
-use win_auto_utils::script_engine::{ScriptEngine, ScriptError};
+use win_auto_utils::script_engine::ScriptEngine;
 
-let mut engine = ScriptEngine::new();
+let engine = ScriptEngine::with_builtin();
 
-match engine.execute_script("invalid syntax here") {
+match engine.compile_and_execute("sleep 10") {
     Ok(_) => println!("Success"),
-    Err(ScriptError::ParseError { line, message }) => {
-        eprintln!("Parse error at line {}: {}", line, message);
-    }
-    Err(ScriptError::RuntimeError { instruction, message }) => {
-        eprintln!("Runtime error in '{}': {}", instruction, message);
-    }
     Err(e) => eprintln!("Error: {}", e),
 }
 ```
 
-### Example 6: Register Manipulation
+### Example 6: Simple Loop
 
 ```rust
 use win_auto_utils::script_engine::ScriptEngine;
 
-let mut engine = ScriptEngine::new();
+let engine = ScriptEngine::with_builtin();
 
-// Use registers for calculations
+// Use loops for repetitive operations
 let script = r#"
-    set $x 10
-    set $y 20
-    add $x $y      # $x = 30
-    mul $x 2       # $x = 60
-    click_at $x $y # Click at position (60, 20)
+    loop 5
+        sleep 10
+    end
 "#;
 
-engine.execute_script(script)?;
+engine.compile_and_execute(script)?;
 ```
 
 ## API Reference
@@ -199,18 +182,18 @@ engine.execute_script(script)?;
 Main entry point for script execution.
 
 **Constructors**:
-- `ScriptEngine::new()` - Create with default configuration
-- `ScriptEngine::with_config(config: ScriptConfig)` - Create with custom config
+- `ScriptEngine::with_builtin()` - Create engine with built-in instructions
+- `ScriptEngine::with_registry_and_config(registry, config)` - Create with custom registry and config
 
 **Methods**:
-- `execute_script(script: &str) -> Result<(), ScriptError>` - Execute script synchronously
-- `execute_script_async(script: &str) -> Result<(), ScriptError>` - Execute in background thread
+- `compile_and_execute(script: &str) -> Result<(), ScriptError>` - Synchronously compile and execute script
+- `compile_and_execute_async(script: &str) -> Result<(), ScriptError>` - Compile and execute in background thread
 - `get_interrupt_controller() -> InterruptController` - Get control handle
 - `get_vm_context() -> VMContext` - Access VM state
 
 #### ScriptConfig
 
-Configuration for script engine behavior.
+Configuration for script engine behavior (default config is usually sufficient).
 
 **Fields**:
 - `max_loop_iterations: u64` - Maximum loop iterations (prevent infinite loops)
@@ -241,84 +224,66 @@ Error types for script operations.
 
 ### Built-in Instructions
 
+Built-in instructions are automatically available via `ScriptEngine::with_builtin()`.
+
 #### Control Flow
 
 | Instruction | Syntax | Description |
 |-------------|--------|-------------|
-| `set` | `set $var value` | Set variable/register |
-| `if` | `if $var > 10 { ... }` | Conditional branch |
-| `loop` | `loop $count { ... }` | Repeat N times |
-| `while` | `while $var > 0 { ... }` | Loop while condition |
-| `jump` | `jump label_name` | Unconditional jump |
-| `label` | `label my_label:` | Define jump target |
+| `loop` | `loop N { ... }` or `loop N ... end` | Repeat N times |
+| `time` | `time MS { ... }` or `time MS ... end` | Loop within time limit |
+| `sleep` | `sleep MS` | Wait milliseconds |
+| `continue` | `continue` | Skip remaining iterations |
+| `break` | `break` | Exit current loop |
 
-#### Arithmetic
+#### Instruction Combination Examples
 
-| Instruction | Syntax | Description |
-|-------------|--------|-------------|
-| `add` | `add $a $b` | Add ($a += $b) |
-| `sub` | `sub $a $b` | Subtract ($a -= $b) |
-| `mul` | `mul $a $b` | Multiply ($a *= $b) |
-| `div` | `div $a $b` | Divide ($a /= $b) |
-| `inc` | `inc $var` | Increment by 1 |
-| `dec` | `dec $var` | Decrement by 1 |
+```rust
+// Simple loop
+loop 3
+    sleep 100
+end
 
-#### Keyboard/Mouse
+// Time-limited loop
+time 500
+    sleep 100
+end
 
-| Instruction | Syntax | Description |
-|-------------|--------|-------------|
-| `click` | `click "key"` | Press and release key |
-| `press` | `press "key"` | Press key (hold) |
-| `release` | `release "key"` | Release key |
-| `move_to` | `move_to x y` | Move mouse to coordinates |
-| `click_at` | `click_at x y` | Click at position |
-| `sleep` | `sleep ms` | Wait milliseconds |
+// With continue and break
+loop 10
+    sleep 50
+    continue    // Skip remaining code
+    sleep 100   // This won't execute
+end
+```
 
 ## Script Syntax
 
-### Variables and Registers
+### Basic Syntax
 
-Variables are prefixed with `$` and stored in VM registers.
+Scripts use simple instruction sequences:
 
 ```rust
-set $health 100
-set $name "player"
-set $position_x 500
+sleep 100        // Wait 100 milliseconds
+loop 5           // Repeat 5 times
+    sleep 50
+end
 ```
 
-### Comments
+### Time-Limited Loops
 
-Single-line comments start with `#`.
-
-```rust
-set $x 10  # This is a comment
-# Full line comment
-```
-
-### Blocks
-
-Code blocks use curly braces `{ }`.
+The `time` instruction creates a loop that runs for a specified duration:
 
 ```rust
-if $health > 50 {
-    click "heal"
+time 500         // Run for at most 500 milliseconds
     sleep 100
-}
+end              // Executes approximately 5 times
 ```
 
-### Operators
+### Loop Control
 
-Supported comparison operators: `>`, `<`, `>=`, `<=`, `==`, `!=`
-
-```rust
-if $health >= 100 {
-    # Full health
-} else if $health > 50 {
-    # Medium health
-} else {
-    # Low health
-}
-```
+- `continue` - Skip remaining instructions in current iteration
+- `break` - Exit loop immediately
 
 ## Architecture Details
 
@@ -371,127 +336,116 @@ Registers:
 
 ## Best Practices
 
-1. **Use Meaningful Variable Names**
+1. **Use `with_builtin()` to Create Engine**
    ```rust
-   # Good
-   set $player_health 100
-   set $enemy_count 5
-   
-   # Bad
-   set $a 100
-   set $b 5
+   // Recommended: Use built-in instructions
+   let engine = ScriptEngine::with_builtin();
+
+   // Or custom registry
+   let mut registry = InstructionRegistry::new();
+   win_auto_utils::scripts_builtin::register_all(&mut registry);
+   let engine = ScriptEngine::with_registry_and_config(registry, ScriptConfig::default());
    ```
 
-2. **Add Comments for Complex Logic**
+2. **Use `compile_and_execute()` to Run Scripts**
    ```rust
-   # Heal when health drops below 30%
-   if $health < 30 {
-       click "health_potion"
-       sleep 500  # Wait for animation
-   }
+   // Good: Compile and execute
+   engine.compile_and_execute("sleep 100\n    continue\n    sleep 100\nend")?;
+
+   // Old API (deprecated)
+   // engine.execute_script(...);
    ```
 
 3. **Set Reasonable Loop Limits**
    ```rust
-   # Good: Finite loop
+   // Good: Finite loop
    loop 100 {
-       click "farm"
-   }
-   
-   # Bad: Potential infinite loop
-   while $true {
-       click "action"
+       sleep 10
    }
    ```
 
-4. **Handle Errors Gracefully**
+4. **Use `time` Instruction for Timeout Control**
    ```rust
-   match engine.execute_script(script) {
-       Ok(_) => log_success(),
-       Err(ScriptError::ParseError { line, .. }) => {
-           eprintln!("Fix syntax at line {}", line);
-       }
-       Err(e) => log_error(e),
-   }
+   // Good: With timeout
+   time 5000
+       sleep 100
+   end
    ```
 
-5. **Use Interrupts for Long Scripts**
+5. **Use `continue` and `break` for Loop Control**
    ```rust
-   let controller = engine.get_interrupt_controller();
-   
-   // Allow user to stop
-   if user_pressed_stop() {
-       controller.stop()?;
-   }
+   loop 100
+       sleep 50
+       continue    // Jump to next iteration
+       sleep 100   // Won't execute
+   end
    ```
 
 ## Common Pitfalls
 
-### ❌ Forgetting Register Prefix
+### ❌ Using Curly Brace Syntax (Not Supported in New Version)
 
 ```rust
-# Wrong
-set health 100
-if health > 50
+// Wrong: Using curly braces
+loop 3 {
+    sleep 100
+}
 
-# Correct
-set $health 100
-if $health > 50
+// Correct: Use end keyword
+loop 3
+    sleep 100
+end
 ```
 
-### ❌ Unclosed Blocks
+### ❌ Using Old API
 
 ```rust
-# Wrong: Missing closing brace
-if $health > 50 {
-    click "heal"
+// Wrong: Old API
+let engine = ScriptEngine::new();
+engine.execute_script("...");
 
-# Correct
-if $health > 50 {
-    click "heal"
-}
+// Correct: New API
+let engine = ScriptEngine::with_builtin();
+engine.compile_and_execute("...")?;
 ```
 
-### ❌ Infinite Loops
+### ❌ Forgetting end Keyword
 
 ```rust
-# Wrong: No termination condition
-loop 999999999 {
-    click "spam"
-}
+// Wrong: Missing end
+loop 3
+    sleep 100
+// Missing end
 
-# Correct: Reasonable limit
-loop 100 {
-    click "action"
-}
+// Correct: Close the block
+loop 3
+    sleep 100
+end
 ```
 
 ## Extending the Engine
 
-### Custom Instruction Handler
+### Register Custom Instructions
 
 ```rust
-use win_auto_utils::script_engine::{
-    InstructionHandler, InstructionData, VM
-};
+use win_auto_utils::script_engine::{Instruction, InstructionHandler, InstructionRegistry, VM};
 
-struct MyCustomInstruction;
+struct MyInstruction;
 
-impl InstructionHandler for MyCustomInstruction {
-    fn parse(&self, tokens: &[Token]) -> Result<InstructionData> {
-        // Parse custom syntax
-        Ok(InstructionData::new("my_instruction"))
+impl InstructionHandler for MyInstruction {
+    fn parse(&self, tokens: &[&str]) -> Result<Instruction, String> {
+        Ok(Instruction::new("my_instruction"))
     }
-    
-    fn execute(&self, vm: &mut VM, data: &InstructionData) {
-        // Custom execution logic
+
+    fn execute(&self, _vm: &mut VM, _instruction: &Instruction) -> Result<(), String> {
         println!("Executing custom instruction");
+        Ok(())
     }
 }
 
 // Register with engine
 let mut registry = InstructionRegistry::new();
-registry.register("my_instruction", Box::new(MyCustomInstruction));
+registry.register("my_instruction", Box::new(MyInstruction));
 ```
 
 ## Performance Characteristics

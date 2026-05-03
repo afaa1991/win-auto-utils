@@ -10,7 +10,7 @@
 
 ```toml
 [dependencies]
-win-auto-utils = { version = "0.1.0", features = ["memory"] }
+win-auto-utils = { version = "0.2.3", features = ["memory"] }
 ```
 
 ## 快速开始

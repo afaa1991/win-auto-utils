@@ -8,7 +8,7 @@ The `process` module provides comprehensive process and window management with a
 
 ```toml
 [dependencies]
-win-auto-utils = { version = "0.2.0", features = ["process"] }
+win-auto-utils = { version = "0.2.3", features = ["process"] }
 ```
 
 ## Quick Start

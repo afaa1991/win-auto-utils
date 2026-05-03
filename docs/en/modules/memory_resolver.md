@@ -8,7 +8,7 @@ The `memory_resolver` module resolves symbolic memory addresses like `"game.exe+
 
 ```toml
 [dependencies]
-win-auto-utils = { version = "0.1.0", features = ["memory_resolver"] }
+win-auto-utils = { version = "0.2.3", features = ["memory_resolver"] }
 ```
 
 ## Quick Start

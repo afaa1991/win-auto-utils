@@ -8,7 +8,7 @@
 
 ```toml
 [dependencies]
-win-auto-utils = { version = "0.1.0", features = ["dll_injector"] }
+win-auto-utils = { version = "0.2.3", features = ["dll_injector"] }
 ```
 
 **平台**: 仅 Windows

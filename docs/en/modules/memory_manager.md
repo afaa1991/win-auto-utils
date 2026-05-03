@@ -60,7 +60,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     manager.set_context(handle, pid);
     
     // 3. Register memory lock feature
-    let value_lock = LockHandler::new_lock_x86_typed(
+    let value_lock = LockHandler::new_lock(
         "value_lock",
         "target_app.exe+0x12345",
         100i32,
@@ -165,28 +165,28 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     manager.set_context(handle, pid);
     
     // Register multiple features
-    let value_lock = LockHandler::new_lock_x86_typed(
+    let value_lock = LockHandler::new_lock(
         "value_lock",
         "target_app.exe+0x1000",
         100i32,
         Duration::from_millis(100),
     )?;
     manager.register("value_lock", value_lock);
-    
-    let nop_patch = BytesSwitchHandler::new_nop_switch_x86(
+
+    let nop_patch = BytesSwitchHandler::new_nop_switch(
         "nop_patch",
         "target_app.exe+0x2000",
         2,
     )?;
     manager.register("nop_patch", nop_patch);
-    
+
     let shellcode = vec![0x90, 0x90]; // NOP instruction
-    let func_hook = TrampolineHookHandler::new_x86_skip_trampoline(
+    let func_hook = TrampolineHookHandler::new_hook_aob(
         "func_hook",
-        AddressSource::from_pattern_x86("target_app.exe+0x3000")?,
+        "48 89 5C 24",  // AOB pattern for function prologue
         shellcode,
         2,
-    );
+    )?;
     manager.register("func_hook", func_hook);
     
     // Test features one by one
@@ -236,7 +236,6 @@ Used for continuous monitoring and value restoration (freeze effect). Architectu
 
 **Constructors:**
 - `new_lock(name, address_pattern, value, interval)` - Static address with auto-detection
-- `new_lock_aob(name, pattern, value, interval)` - AOB pattern scanning
 
 **Example:**
 ```rust
@@ -384,7 +383,7 @@ manager.activate_all()?;
 A: Yes, you can register new modifiers at any time:
 
 ```rust
-let new_handler = LockHandler::new_lock_x86_typed(...)?;
+let new_handler = LockHandler::new_lock(...)?;
 manager.register("new_feature", new_handler);
 manager.activate("new_feature")?;
 ```

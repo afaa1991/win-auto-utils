@@ -21,11 +21,11 @@ A universal Windows automation utility library providing atomic modules for memo
 
 ### Key Advantages
 
-✅ **Atomic Design**: Enable only what you need via feature flags  
-✅ **Minimal Dependencies**: Core features depend only on `windows` crate  
-✅ **Performance**: Release mode with LTO, size optimization, symbol stripping  
-✅ **Safety**: Rust's ownership system prevents common memory errors  
-✅ **Cross-platform Script Engine**: Pure Rust, no external dependencies  
+✅ **Atomic Design**: Enable only what you need via feature flags
+✅ **Minimal Dependencies**: Core features depend only on `windows` crate
+✅ **Performance**: Release mode with LTO, size optimization, symbol stripping
+✅ **Safety**: Rust's ownership system prevents common memory errors
+✅ **Cross-platform Script Engine**: Pure Rust, no external dependencies
 
 ## 📦 Installation
 
@@ -33,14 +33,14 @@ Add to your `Cargo.toml`:
 
 ```toml
 [dependencies]
-win-auto-utils = { version = "0.2.0", features = ["standard"] }
+win-auto-utils = { version = "0.2.3", features = ["standard"] }
 ```
 
 For full functionality including template matching:
 
 ```toml
 [dependencies]
-win-auto-utils = { version = "0.2.0", features = ["full"] }
+win-auto-utils = { version = "0.2.3", features = ["full"] }
 ```
 
 ## 🎯 Quick Start
@@ -109,15 +109,24 @@ write_memory_t::<f32>(handle, address, 999.0)?;
 ### Input Simulation
 
 ```rust
-use win_auto_utils::keyboard::key_press;
-use win_auto_utils::mouse::{move_to, left_click};
+use win_auto_utils::keyboard::{SendInputKeyboard, PostMessageKeyboard};
+use win_auto_utils::mouse::{SendInputMouse, PostMessageMouse};
 
-// Press 'A' key
-key_press(handle, 0x41)?;
+// SendInput method (system-level input, works with all apps)
+let mut kb = SendInputKeyboard::new();
+kb.click("a")?;
 
-// Move mouse and click
-move_to(handle, 100, 200)?;
-left_click(handle)?;
+let mut mouse = SendInputMouse::new();
+mouse.move_to(100, 200)?;
+mouse.click_left()?;
+
+// PostMessage method (background input, no focus required, needs HWND)
+let kb = PostMessageKeyboard::new(hwnd);
+kb.click("a")?;
+
+let mouse = PostMessageMouse::new(hwnd);
+mouse.move_to(100, 200)?;
+mouse.click_left_at(100, 200)?;
 ```
 
 ### Screen Capture (DXGI)
@@ -128,6 +137,34 @@ use win_auto_utils::dxgi::DxgiCapture;
 let mut capture = DxgiCapture::new()?;
 let image = capture.capture_window(hwnd)?;
 ```
+
+### Color Finding
+
+Search for colors in screen regions or pixel buffers with automatic AVX2 optimization:
+
+```rust
+use win_auto_utils::color_finder::{find_color, find_color_in_buffer};
+
+// Method 1: Find color in screen region (uses DXGI capture internally)
+match find_color(100, 100, 50, 50, (255, 0, 0)) {  // Search red in 50x50 region
+    Ok(result) => {
+        if result.matched {
+            println!("Found at screen coordinates ({}, {})", result.x, result.y);
+        }
+    }
+    Err(e) => eprintln!("Error: {}", e),
+}
+
+// Method 2: Find color in pixel buffer (pure algorithm, no screen capture)
+use win_auto_utils::color_finder::algorithms::find_color_in_buffer;
+let buffer: Vec<u8> = vec![0; 100 * 100 * 4];  // 100x100 BGRA pixels
+let result = find_color_in_buffer(&buffer, 100, 100, (0, 255, 0));  // Search green
+```
+
+**Features:**
+- AVX2 SIMD acceleration (~4-8x faster on supported hardware)
+- Automatic fallback to scalar implementation
+- Works with any BGRA pixel buffer source
 
 ### Memory Hooking (Recommended: Using Memory Manager)
 
@@ -297,6 +334,8 @@ cargo build --no-default-features --features "full"
 | `process` | Process management | windows, hwnd, hdc, snapshot, handle |
 | `keyboard` | Keyboard input | windows |
 | `mouse` | Mouse control | windows |
+| `color_picker` | GDI color picking | windows |
+| `color_finder` | Pixel color search (AVX2/SIMD) | dxgi |
 | `memory` | Memory read/write | windows |
 | `memory_hook` | Hooking system | memory, windows |
 | `memory_aobscan` | Pattern scanning | memory, memchr, rayon |
@@ -392,3 +431,4 @@ cargo test --features "scripts_builtin"
 
 # Test memory operations
 cargo test --features "memory"
+```

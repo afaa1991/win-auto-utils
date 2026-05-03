@@ -8,7 +8,7 @@ The `dll_injector` module provides functionality to inject and unload DLLs into 
 
 ```toml
 [dependencies]
-win-auto-utils = { version = "0.1.0", features = ["dll_injector"] }
+win-auto-utils = { version = "0.2.3", features = ["dll_injector"] }
 ```
 
 **Platform**: Windows only

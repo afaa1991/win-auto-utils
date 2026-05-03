@@ -10,7 +10,7 @@ Enable this module in your `Cargo.toml`:
 
 ```toml
 [dependencies]
-win-auto-utils = { version = "0.1.0", features = ["memory"] }
+win-auto-utils = { version = "0.2.3", features = ["memory"] }
 ```
 
 ## Quick Start

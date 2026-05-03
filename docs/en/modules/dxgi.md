@@ -8,7 +8,7 @@ The `dxgi` module provides ultra-high-performance screen capture using Windows D
 
 ```toml
 [dependencies]
-win-auto-utils = { version = "0.1.0", features = ["dxgi"] }
+win-auto-utils = { version = "0.2.3", features = ["dxgi"] }
 ```
 
 **Platform**: Windows only (requires DirectX 11+)
@@ -18,15 +18,15 @@ win-auto-utils = { version = "0.1.0", features = ["dxgi"] }
 ### Basic Screen Capture
 
 ```rust
-use win_auto_utils::dxgi::DxgiCapture;
+use win_auto_utils::dxgi::{capture_region_bytes, get_screen_size};
 
-// Create capture instance
-let mut capture = DxgiCapture::new()?;
+// Get screen dimensions
+let (width, height) = get_screen_size()?;
+println!("Screen resolution: {}x{}", width, height);
 
-// Capture full screen
-let frame = capture.capture_frame()?;
-println!("Frame size: {}x{}", frame.width, frame.height);
-println!("Data length: {} bytes", frame.data.len());
+// Capture full screen (using large region)
+let bytes = capture_region_bytes(0, 0, width as i32, height as i32)?;
+println!("Data length: {} bytes", bytes.len());
 
 // Frame data is in BGRA format (4 bytes per pixel)
 ```
@@ -34,13 +34,11 @@ println!("Data length: {} bytes", frame.data.len());
 ### Capture Specific Region
 
 ```rust
-use win_auto_utils::dxgi::DxgiCapture;
-
-let mut capture = DxgiCapture::new()?;
+use win_auto_utils::dxgi::capture_region_bytes;
 
 // Capture a 200x100 region at position (100, 50)
-let region = capture.capture_region(100, 50, 200, 100)?;
-println!("Region captured: {}x{}", region.width, region.height);
+let bytes = capture_region_bytes(100, 50, 200, 100)?;
+println!("Region captured: {} bytes", bytes.len());
 ```
 
 ## Key Features
@@ -57,18 +55,17 @@ println!("Region captured: {}x{}", region.width, region.height);
 ### Example 1: Continuous Frame Capture
 
 ```rust
-use win_auto_utils::dxgi::DxgiCapture;
+use win_auto_utils::dxgi::capture_region_bytes;
 use std::time::Instant;
-
-let mut capture = DxgiCapture::new()?;
 
 // Capture 100 frames and measure performance
 let start = Instant::now();
+
 for i in 0..100 {
-    let frame = capture.capture_frame()?;
-    
+    let bytes = capture_region_bytes(0, 0, 1920, 1080)?;
+
     if i % 10 == 0 {
-        println!("Frame {}: {}x{}", i, frame.width, frame.height);
+        println!("Frame {}: {} bytes", i, bytes.len());
     }
 }
 
@@ -80,9 +77,7 @@ println!("Average FPS: {:.2}", fps);
 ### Example 2: Region-Based Monitoring
 
 ```rust
-use win_auto_utils::dxgi::DxgiCapture;
-
-let mut capture = DxgiCapture::new()?;
+use win_auto_utils::dxgi::capture_region_bytes;
 
 // Monitor a specific UI element (e.g., health bar)
 let health_bar_x = 100;
@@ -91,16 +86,15 @@ let health_bar_width = 200;
 let health_bar_height = 20;
 
 loop {
-    let region = capture.capture_region(
+    let bytes = capture_region_bytes(
         health_bar_x,
         health_bar_y,
         health_bar_width,
         health_bar_height,
     )?;
-    
+
     // Process region data (e.g., color analysis)
-    analyze_health_bar(&region.data);
-    
+
     std::thread::sleep(std::time::Duration::from_millis(16)); // ~60 FPS
 }
 ```
@@ -108,23 +102,16 @@ loop {
 ### Example 3: Error Handling and Recovery
 
 ```rust
-use win_auto_utils::dxgi::{DxgiCapture, DxgiError};
+use win_auto_utils::dxgi::{capture_region_bytes, DxgiError};
 
 fn capture_with_recovery() -> Result<(), Box<dyn std::error::Error>> {
-    let mut capture = DxgiCapture::new()?;
-    
     loop {
-        match capture.capture_frame() {
-            Ok(frame) => {
-                process_frame(&frame);
+        match capture_region_bytes(0, 0, 1920, 1080) {
+            Ok(bytes) => {
+                process_bytes(&bytes);
             }
             Err(DxgiError::CaptureFailed(msg)) => {
                 eprintln!("Capture failed: {}", msg);
-                
-                // Try to reinitialize
-                eprintln!("Reinitializing...");
-                capture = DxgiCapture::new()?;
-                
                 std::thread::sleep(std::time::Duration::from_secs(1));
             }
             Err(e) => {
@@ -138,30 +125,23 @@ fn capture_with_recovery() -> Result<(), Box<dyn std::error::Error>> {
 ### Example 4: Multi-Monitor Support
 
 ```rust
-use win_auto_utils::dxgi::DxgiCapture;
+use win_auto_utils::dxgi::get_screen_size;
 
-// By default, captures the primary monitor
-let mut capture = DxgiCapture::new()?;
-
-// Get screen dimensions
-let width = capture.get_width();
-let height = capture.get_height();
+// Get primary screen dimensions
+let (width, height) = get_screen_size()?;
 
 println!("Primary monitor: {}x{}", width, height);
 
-// To capture specific monitor, modify source code to select adapter/output
+// To capture specific monitor, use lower-level API
 ```
 
 ### Example 5: Frame Processing Pipeline
 
 ```rust
-use win_auto_utils::dxgi::DxgiCapture;
-
-let mut capture = DxgiCapture::new()?;
+use win_auto_utils::dxgi::capture_region_bytes;
 
 // Capture and convert to RGB
-let frame = capture.capture_frame()?;
-let bgra_data = &frame.data;
+let bgra_data = capture_region_bytes(0, 0, 1920, 1080)?;
 
 // Convert BGRA to RGB (skip alpha channel)
 let mut rgb_data = Vec::with_capacity(bgra_data.len() * 3 / 4);
@@ -178,22 +158,20 @@ println!("RGB data size: {} bytes", rgb_data.len());
 ### Example 6: Performance Benchmarking
 
 ```rust
-use win_auto_utils::dxgi::DxgiCapture;
+use win_auto_utils::dxgi::capture_region_bytes;
 use std::time::Instant;
-
-let mut capture = DxgiCapture::new()?;
 
 // Warm-up
 for _ in 0..10 {
-    let _ = capture.capture_frame()?;
+    let _ = capture_region_bytes(0, 0, 100, 100)?;
 }
 
 // Benchmark
-let iterations = 1000;
+let iterations = 100;
 let start = Instant::now();
 
 for _ in 0..iterations {
-    let _ = capture.capture_frame()?;
+    let _ = capture_region_bytes(0, 0, 100, 100)?;
 }
 
 let elapsed = start.elapsed();
@@ -206,40 +184,30 @@ println!("Achieved FPS: {:.2}", fps);
 
 ## API Reference
 
+### Main Functions
+
+DXGI module provides direct functional API:
+
+#### Capture Functions
+
+- **`capture_region_bytes(x, y, width, height) -> Result<Vec<u8>, DxgiError>`**
+  - Captures a screenshot of the specified region
+  - Returns BGRA format byte data
+  - x, y are starting coordinates, width, height are region dimensions
+
+- **`get_screen_size() -> Result<(i32, i32), DxgiError>`**
+  - Gets primary screen dimensions
+  - Returns (width, height) tuple
+
 ### Main Types
-
-#### DxgiCapture
-
-Main struct for DXGI screen capture.
-
-**Constructor**:
-- `DxgiCapture::new() -> Result<Self, DxgiError>` - Create new capture instance
-
-**Methods**:
-- `capture_frame() -> Result<CapturedFrame, DxgiError>` - Capture full screen
-- `capture_region(x, y, w, h) -> Result<CapturedFrame, DxgiError>` - Capture specific region
-- `get_width() -> usize` - Get screen width
-- `get_height() -> usize` - Get screen height
-
-#### CapturedFrame
-
-Represents a captured frame.
-
-**Fields**:
-- `data: Vec<u8>` - Pixel data in BGRA format (4 bytes per pixel)
-- `width: usize` - Frame width in pixels
-- `height: usize` - Frame height in pixels
-
-**Methods**:
-- `get_pixel(x, y) -> Option<(u8, u8, u8, u8)>` - Get pixel color (B, G, R, A)
 
 #### DxgiError
 
-Error types for DXGI operations.
+Error type for DXGI operations.
 
 **Variants**:
 - `CaptureFailed(String)` - Capture operation failed
-- `RegionOutOfBounds` - Requested region exceeds screen bounds
+- `RegionOutOfBounds` - Requested region is outside screen bounds
 - `InvalidRegionDimensions` - Invalid width or height (zero or negative)
 - `InitializationFailed(String)` - Failed to initialize DXGI
 - `LockFailed` - Failed to acquire lock
@@ -272,37 +240,31 @@ Error types for DXGI operations.
 
 ## Best Practices
 
-1. **Reuse Capture Instance**
+1. **Use Capture Functions Directly**
    ```rust
-   // Good: Reuse instance
+   // Good: Call functions directly
+   let bytes = capture_region_bytes(100, 50, 200, 100)?;
+
+   // Bad: Reinitializing every time
    let mut capture = DxgiCapture::new()?;
-   for _ in 0..1000 {
-       let frame = capture.capture_frame()?;
-   }
-   
-   // Bad: Create new instance each time
-   for _ in 0..1000 {
-       let capture = DxgiCapture::new()?;  // Slow!
-       let frame = capture.capture_frame()?;
-   }
    ```
 
 2. **Capture Only Needed Regions**
    ```rust
    // Good: Small region
-   let region = capture.capture_region(100, 50, 200, 100)?;
-   
+   let bytes = capture_region_bytes(100, 50, 200, 100)?;
+
    // Bad: Full screen when only small area needed
-   let frame = capture.capture_frame()?;  // Wastes resources
+   let bytes = capture_region_bytes(0, 0, 1920, 1080)?; // Waste of resources
    ```
 
 3. **Handle Errors Gracefully**
    ```rust
-   match capture.capture_frame() {
-       Ok(frame) => process(frame),
+   match capture_region_bytes(0, 0, 1920, 1080) {
+       Ok(bytes) => process_bytes(&bytes),
        Err(DxgiError::CaptureFailed(_)) => {
-           // Reinitialize on access lost
-           capture = DxgiCapture::new()?;
+           // Retry on access loss
+           std::thread::sleep(std::time::Duration::from_secs(1));
        }
        Err(e) => return Err(e),
    }
@@ -312,7 +274,7 @@ Error types for DXGI operations.
    ```rust
    // For UI monitoring: 10-30 FPS is sufficient
    std::thread::sleep(Duration::from_millis(33)); // 30 FPS
-   
+
    // For gaming: 60+ FPS may be needed
    std::thread::sleep(Duration::from_millis(16)); // 60 FPS
    ```
@@ -320,8 +282,8 @@ Error types for DXGI operations.
 5. **Process Frames Efficiently**
    ```rust
    // Avoid copying large vectors
-   let frame = capture.capture_frame()?;
-   process_in_place(&frame.data);  // Borrow instead of clone
+   let bytes = capture_region_bytes(0, 0, 1920, 1080)?;
+   process_in_place(&bytes);  // Borrow instead of clone
    ```
 
 ## Common Pitfalls
@@ -329,16 +291,18 @@ Error types for DXGI operations.
 ### ❌ Not Handling Access Lost
 
 ```rust
-// Wrong: Crashes on display mode change
-let frame = capture.capture_frame()?;
+// Wrong: May fail on display mode change
+let bytes = capture_region_bytes(0, 0, 1920, 1080)?;
 
-// Correct: Handle and recover
-match capture.capture_frame() {
-    Ok(frame) => use_frame(frame),
-    Err(DxgiError::CaptureFailed(msg)) if msg.contains("Access lost") => {
-        capture = DxgiCapture::new()?;  // Reinitialize
+// Correct: Handle and retry
+loop {
+    match capture_region_bytes(0, 0, 1920, 1080) {
+        Ok(bytes) => break,
+        Err(DxgiError::CaptureFailed(_)) => {
+            std::thread::sleep(std::time::Duration::from_secs(1));
+        }
+        Err(e) => return Err(e),
     }
-    Err(e) => return Err(e),
 }
 ```
 
@@ -346,13 +310,12 @@ match capture.capture_frame() {
 
 ```rust
 // Wrong: May panic or return error
-let region = capture.capture_region(10000, 10000, 200, 100)?;
+let bytes = capture_region_bytes(10000, 10000, 200, 100)?;
 
 // Correct: Check bounds first
-let width = capture.get_width();
-let height = capture.get_height();
+let (width, height) = get_screen_size()?;
 if x + w <= width && y + h <= height {
-    let region = capture.capture_region(x, y, w, h)?;
+    let bytes = capture_region_bytes(x, y, w, h)?;
 }
 ```
 
@@ -360,12 +323,12 @@ if x + w <= width && y + h <= height {
 
 ```rust
 // Wrong: Heavy processing blocks next capture
-let frame = capture.capture_frame()?;
-heavy_image_processing(&frame);  // Takes 100ms - drops FPS
+let bytes = capture_region_bytes(0, 0, 1920, 1080)?;
+heavy_image_processing(&bytes);  // Takes 100ms - drops FPS
 
 // Correct: Use separate thread or queue
-let frame = capture.capture_frame()?;
-tx.send(frame)?;  // Send to worker thread
+let bytes = capture_region_bytes(0, 0, 1920, 1080)?;
+tx.send(bytes)?;  // Send to worker thread
 ```
 
 ## Platform Requirements
