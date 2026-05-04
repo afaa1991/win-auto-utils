@@ -45,16 +45,30 @@ pub fn scan_with_multi_byte_anchor(
                 let offset_diff = offset as isize - first_offset as isize;
                 let check_pos = global_pos as isize + offset_diff;
 
-                if check_pos < 0
-                    || check_pos as usize >= buffer.len()
-                    || buffer[check_pos as usize] != byte
-                {
+                // FIX: Separate boundary checks to prevent unsigned integer overflow
+                // When check_pos is negative, check_pos as usize becomes a very large positive number
+                // This could bypass the boundary check and cause memory access violations
+                if check_pos < 0 || check_pos as usize >= buffer.len() {
+                    all_match = false;
+                    break;
+                }
+                if buffer[check_pos as usize] != byte {
                     all_match = false;
                     break;
                 }
             }
 
             if all_match {
+                
+                // FIX: Prevent negative pattern_start calculation
+                // When global_pos < first_offset, pattern_start would be negative
+                // Converting negative usize causes integer overflow and invalid memory access
+                // This occurs when anchor is found in buffer's beginning but pattern can't fit
+                if global_pos < first_offset {
+                    search_start = global_pos + 1;
+                    continue;
+                }
+
                 let pattern_start = global_pos - first_offset;
 
                 if pattern_start + pattern.bytes.len() <= buffer.len() {
