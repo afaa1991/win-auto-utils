@@ -55,20 +55,18 @@ pub fn scan_with_multi_byte_anchor(
             }
 
             if all_match {
-                // Anchor sequence matched, perform full pattern verification
                 let pattern_start = global_pos - first_offset;
 
                 if pattern_start + pattern.bytes.len() <= buffer.len() {
                     if verify_pattern(buffer, pattern_start, pattern) {
                         let result_addr = base_addr + pattern_start;
 
-                        // Signal all other threads to stop
-                        found_first.store(true, Ordering::Release);
-
                         results.push(result_addr);
 
-                        // Break out of memchr loop
-                        break;
+                        if !find_all {
+                            found_first.store(true, Ordering::Release);
+                            break;
+                        }
                     }
                 }
             }
@@ -105,13 +103,12 @@ pub fn scan_with_single_byte_anchor(
                 if verify_pattern(buffer, buffer_offset, pattern) {
                     let result_addr = base_addr + buffer_offset;
 
-                    // Signal all other threads to stop
-                    found_first.store(true, Ordering::Release);
-
                     results.push(result_addr);
 
-                    // Break out of memchr loop
-                    break;
+                    if !find_all {
+                        found_first.store(true, Ordering::Release);
+                        break;
+                    }
                 }
             }
 

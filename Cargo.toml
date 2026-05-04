@@ -1,6 +1,6 @@
 [package]
 name = "win-auto-utils"
-version = "0.2.3"
+version = "0.2.4"
 edition = "2021"
 description = "Universal Windows automation utilities with memory, window, input, and color operations"
 authors = ["CC"]
