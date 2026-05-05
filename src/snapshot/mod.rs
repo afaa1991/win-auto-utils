@@ -212,6 +212,65 @@ pub fn list_processes() -> Vec<(u32, String)> {
 /// }
 /// ```
 pub fn get_module_base_address(pid: u32, module_name: &str) -> Option<usize> {
+    get_module_info(pid, module_name).map(|info| info.addr)
+}
+
+/// List all modules loaded in a process with their base addresses
+///
+/// # Arguments
+/// * `pid` - The process ID
+///
+/// # Returns
+/// A vector of tuples containing (module name, base address as usize)
+///
+/// # Example
+/// ```no_run
+/// use win_auto_utils::snapshot::{find_pid, list_modules};
+///
+/// if let Some(pid) = find_pid("notepad.exe") {
+///     for (name, addr) in list_modules(pid) {
+///         println!("Module: {}, Address: 0x{:X}", name, addr);
+///     }
+/// }
+/// ```
+pub fn list_modules(pid: u32) -> Vec<(String, usize)> {
+    list_modules_info(pid).into_iter().map(|info| (info.name, info.addr)).collect()
+}
+
+/// Module information struct
+pub struct ModuleInfo {
+    /// Module name
+    pub name: String,
+    /// Module base address
+    pub addr: usize,
+    /// Size of the module
+    pub size: usize,
+}
+
+
+/// Get the base address of a module (DLL or EXE) in a process
+///
+/// # Arguments
+/// * `pid` - The process ID
+/// * `module_name` - The name of the module (e.g., "kernel32.dll" or "game.exe")
+///
+/// # Returns
+/// * `Some(ModuleInfo)` - The module information if found
+/// * `None` - If the module is not loaded in the process
+///
+/// # Example
+/// ```no_run
+/// use win_auto_utils::snapshot::{find_pid, get_module_base_address};
+///
+/// if let Some(pid) = find_pid("notepad.exe") {
+///     if let Some(info) = get_module_info(pid, "kernel32.dll") {
+///         println!("Kernel32.dll name: {}", info.name);
+///         println!("Kernel32.dll base address: 0x{:X}", info.addr);
+///         println!("Kernel32.dll size: {}", info.size);
+///     }
+/// }
+/// ```
+pub fn get_module_info(pid: u32, module_name: &str) -> Option<ModuleInfo> {
     unsafe {
         // Create a snapshot of all modules in the process
         // TH32CS_SNAPMODULE | TH32CS_SNAPMODULE32 ensures compatibility with both 32-bit and 64-bit
@@ -238,7 +297,11 @@ pub fn get_module_base_address(pid: u32, module_name: &str) -> Option<usize> {
             if name.eq_ignore_ascii_case(module_name) {
                 let addr = entry.modBaseAddr as usize;
                 let _ = CloseHandle(snapshot);
-                return Some(addr);
+                return Some(ModuleInfo {
+                    name,
+                    addr,
+                    size: entry.modBaseSize as usize,
+                });
             }
 
             // Clear the buffer before next iteration to prevent name overlap
@@ -269,12 +332,12 @@ pub fn get_module_base_address(pid: u32, module_name: &str) -> Option<usize> {
 /// use win_auto_utils::snapshot::{find_pid, list_modules};
 ///
 /// if let Some(pid) = find_pid("notepad.exe") {
-///     for (name, addr) in list_modules(pid) {
-///         println!("Module: {}, Address: 0x{:X}", name, addr);
+///     for info in list_modules_info(pid) {
+///         println!("Module: {}, Address: 0x{:X}, Size: {}", info.name, info.addr, info.size);
 ///     }
 /// }
 /// ```
-pub fn list_modules(pid: u32) -> Vec<(String, usize)> {
+pub fn list_modules_info(pid: u32) -> Vec<ModuleInfo> {
     let mut modules = Vec::new();
 
     unsafe {
@@ -290,8 +353,11 @@ pub fn list_modules(pid: u32) -> Vec<(String, usize)> {
         if Module32First(snapshot, &mut entry).is_ok() {
             loop {
                 let name = char_array_to_string(&entry.szModule);
-                let addr = entry.modBaseAddr as usize;
-                modules.push((name, addr));
+                modules.push(ModuleInfo {
+                    name,
+                    addr: entry.modBaseAddr as usize,
+                    size: entry.modBaseSize as usize,
+                });
 
                 // Clear the buffer before next iteration to prevent name overlap
                 entry.szModule = [0i8; 256];
