@@ -1,4 +1,4 @@
-# Memory AOB Scanner (Array of Bytes)
+﻿# Memory AOB Scanner (Array of Bytes)
 
 [中文文档](../../zh/modules/memory_aobscan.md) | [Back to Overview](overview.md)
 
@@ -8,7 +8,7 @@ The `memory_aobscan` module provides high-performance pattern scanning in remote
 
 ```toml
 [dependencies]
-win-auto-utils = { version = "0.2.3", features = ["memory_aobscan"] }
+win-auto-utils = { version = "0.2.6", features = ["memory_aobscan"] }
 ```
 
 ## Quick Start
@@ -276,7 +276,7 @@ Patterns are space-separated hex bytes with optional wildcards.
 ### Optimization Techniques
 
 1. **Anchor Selection**: Chooses rarest byte sequence for initial memchr search
-2. **SIMD Verification**: Uses AVX2 to verify 32 bytes simultaneously
+2. **SIMD Verification**: Uses AVX-512 (64 bytes) or AVX2 (32 bytes) with automatic selection
 3. **Parallel Regions**: Splits memory into chunks for multi-threaded scanning
 4. **Prefetching**: Hides memory latency with software prefetch hints
 5. **Region Filtering**: Skips uncommitted/unreadable memory pages
@@ -415,7 +415,8 @@ let results = AobScanBuilder::new(handle)
 
 3. **Pattern Verification**
    - Validates full pattern at candidate positions
-   - Uses AVX2 SIMD for 32-byte parallel comparison
+   - Uses AVX-512 (64 bytes) or AVX2 (32 bytes) for parallel comparison
+   - Falls back to scalar with software prefetching for short patterns
    - Software prefetching hides memory latency
 
 ### SIMD Acceleration

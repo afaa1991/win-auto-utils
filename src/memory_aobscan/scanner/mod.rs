@@ -1,11 +1,22 @@
-//! Scanner module for AOB scanning engine
+//! AOB Scan Engine
 //!
-//! Provides the core scanning logic with parallel processing and early exit support.
+//! Core scanning module that orchestrates region discovery, anchor searching,
+//! and pattern verification with parallel processing support.
+//!
+//! # Architecture
+//! - **Anchor-based heuristic search**: Uses memchr to locate candidate positions
+//! - **Multi-threaded region processing**: Rayon-based parallel scanning
+//! - **Dynamic chunk sizing**: Adaptive based on pattern length
+//! - **Early-exit support**: Stop immediately when first match found
+//! - **Batch result collection**: Reduces mutex contention
 
 pub(crate) mod parallel;
-mod strategy;
+pub mod strategy;
 
 pub use scan_engine::aob_scan_internal;
+
+#[cfg(test)]
+pub use scan_engine::calculate_optimal_chunk_size;
 
 mod scan_engine {
     use super::parallel;
@@ -18,28 +29,45 @@ mod scan_engine {
     use std::sync::atomic::AtomicBool;
     use windows::Win32::Foundation::HANDLE;
 
-    /// Calculate optimal chunk size based on pattern length and memory characteristics
+    /// Calculates optimal chunk size for memory reading based on pattern length.
     ///
-    /// Balances between:
-    /// - System call overhead (larger chunks = fewer calls)
-    /// - Memory usage (smaller chunks = less RAM per thread)
-    /// - CPU cache efficiency (smaller chunks = better L2/L3 cache hit rate)
+    /// Balances system call overhead, memory usage, and CPU cache efficiency:
+    /// - **Very short patterns** (≤4 bytes): Use very large chunks (4MB) to minimize syscalls
+    /// - **Short patterns** (5-16 bytes): Use large chunks (2MB) for good balance
+    /// - **Medium patterns** (17-64 bytes): Use moderate chunks (512KB) for cache efficiency
+    /// - **Long patterns** (>64 bytes): Use smaller chunks (128KB) for maximum cache hits
     ///
-    /// # Strategy
-    /// - Very short patterns (≤4 bytes): Use very large chunks (4MB) to minimize syscalls
-    /// - Short patterns (5-16 bytes): Use large chunks (2MB) for good balance
-    /// - Medium patterns (17-64 bytes): Use moderate chunks (512KB) for cache efficiency
-    /// - Long patterns (>64 bytes): Use smaller chunks (128KB) for maximum cache hits
+    /// # Arguments
+    /// * `pattern_len` - Length of search pattern in bytes
+    ///
+    /// # Returns
+    /// Optimal chunk size in bytes
     pub fn calculate_optimal_chunk_size(pattern_len: usize) -> usize {
         match pattern_len {
-            0..=4 => 4 * 1024 * 1024, // 4MB - Minimize syscall overhead for tiny patterns
+            0..=4 => 4 * 1024 * 1024,  // 4MB - Minimize syscall overhead for tiny patterns
             5..=16 => 2 * 1024 * 1024, // 2MB - Good balance for common game patterns
             17..=64 => 512 * 1024,    // 512KB - Better cache locality for medium patterns
             _ => 128 * 1024,          // 128KB - Maximum cache efficiency for long patterns
         }
     }
 
-    /// Internal implementation of the AOB scan logic.
+    /// Internal implementation of AOB pattern scanning.
+    ///
+    /// Orchestrates the entire scan workflow:
+    /// 1. Discovers valid memory regions (with optional caching)
+    /// 2. Selects optimal anchor strategy (multi-byte or single rarest byte)
+    /// 3. Parallel processes regions with batch result collection
+    ///
+    /// # Arguments
+    /// * `handle` - Target process handle with PROCESS_VM_READ access
+    /// * `pattern` - Pattern to search for
+    /// * `start_address` - Memory address to start scan (0 = entire address space)
+    /// * `length` - Bytes to scan (0 = scan all available)
+    /// * `find_all` - `true` to find all matches, `false` to stop at first
+    /// * `use_cache` - `true` to cache region information, `false` to re-query
+    ///
+    /// # Returns
+    /// Vector of matching addresses, sorted ascending
     pub fn aob_scan_internal(
         handle: HANDLE,
         pattern: &Pattern,

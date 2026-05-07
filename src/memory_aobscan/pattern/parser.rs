@@ -1,30 +1,39 @@
-//! Pattern parsing module
+//! Pattern Parser
 //!
-//! Handles parsing of pattern strings into structured byte patterns with masks.
+//! Handles parsing of hex pattern strings with wildcard support into structured
+//! Pattern instances, with pre-computed SIMD-compatible mask bytes and intelligent
+//! anchor selection.
 
 use super::anchor::find_best_anchor_sequence;
 
-/// Represents a parsed byte pattern with a mask for wildcard support.
+/// Parsed byte pattern with wildcard support.
+///
+/// Includes pre-computed mask bytes for SIMD verification and optional
+/// multi-byte anchor sequence for optimized heuristic scanning.
 #[derive(Debug, Clone)]
 pub struct Pattern {
+    /// Pattern byte values (wildcards stored as 0x00)
     pub bytes: Vec<u8>,
+    /// Pattern mask (true = known byte, false = wildcard)
     pub mask: Vec<bool>,
-    pub mask_bytes: Vec<u8>, // Pre-computed mask: 0xFF for true, 0x00 for false (for SIMD)
-
-    // Multi-byte anchor sequence for heuristic optimization
-    // Stores (offset, byte) pairs for 2-4 consecutive known bytes
+    /// Pre-computed mask bytes for SIMD (0xFF for true, 0x00 for false)
+    pub mask_bytes: Vec<u8>,
+    /// Multi-byte anchor sequence for heuristic optimization
+    /// Stores (offset, byte) pairs for 2-4 consecutive known bytes
     pub anchor_sequence: Option<Vec<(usize, u8)>>,
 }
 
 impl Pattern {
-    /// Parses a string like "48 ?? 55 ??" into a Pattern.
+    /// Parses a pattern string like "48 ?? 55" into a structured Pattern.
+    ///
+    /// Supports both "??" and "?" as wildcard tokens.
     ///
     /// # Arguments
     /// * `pattern_str` - Space-separated hex bytes with optional wildcards
     ///
     /// # Returns
-    /// * `Ok(Pattern)` - The parsed pattern with bytes and mask
-    /// * `Err(String)` - If parsing fails
+    /// * `Ok(Pattern)` - Structured pattern with bytes, mask, and anchor
+    /// * `Err(String)` - If pattern is empty or contains invalid hex bytes
     ///
     /// # Examples
     /// ```

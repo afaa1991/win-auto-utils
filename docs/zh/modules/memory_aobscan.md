@@ -1,4 +1,4 @@
-# 内存 AOB 扫描器 (Memory AOB Scanner - Array of Bytes)
+﻿# 内存 AOB 扫描器 (Memory AOB Scanner - Array of Bytes)
 
 [English](../../en/modules/memory_aobscan.md) | [返回概览](overview.md)
 
@@ -8,7 +8,7 @@
 
 ```
 [dependencies]
-win-auto-utils = { version = "0.2.3", features = ["memory_aobscan"] }
+win-auto-utils = { version = "0.2.6", features = ["memory_aobscan"] }
 ```
 
 ## 快速开始
@@ -276,7 +276,7 @@ AOB 扫描操作的错误类型。
 ### 优化技术
 
 1. **锚点选择**: 选择最稀有的字节序列进行初始 memchr 搜索
-2. **SIMD 验证**: 使用 AVX2 同时验证 32 字节
+2. **SIMD 验证**: 自动选择 AVX-512（64字节）或 AVX2（32字节）进行并行比较
 3. **并行区域**: 将内存分成块进行多线程扫描
 4. **预取**: 使用软件预取提示隐藏内存延迟
 5. **区域过滤**: 跳过未提交/不可读的内存页
@@ -415,7 +415,8 @@ let results = AobScanBuilder::new(handle)
 
 3. **模式验证**
    - 在候选位置验证完整模式
-   - 使用 AVX2 SIMD 进行 32 字节并行比较
+   - 使用 AVX-512（64字节）或 AVX2（32字节）进行并行比较
+   - 对于短模式回退到带软件预取的标量实现
    - 软件预取隐藏内存延迟
 
 ### SIMD 加速

@@ -1,56 +1,98 @@
-//! Verifier module for pattern matching
+//! Pattern Verifier Module
 //!
-//! Provides pattern verification with SIMD acceleration and prefetching.
+//! Provides hardware-accelerated pattern verification with automatic dispatching
+//! to scalar, AVX2, or AVX-512 implementations based on CPU capabilities and
+//! pattern length.
+//!
+//! # CPU Feature Selection
+//! - **AVX-512**: Patterns ≥ 32 bytes (if supported)
+//! - **AVX2**: Patterns ≥ 16 bytes (if supported)
+//! - **Scalar + Prefetch**: Fallback for short patterns or non-x86_64 systems
+//!
+//! # Optimization Features
+//! - **One-time CPU feature detection**: Cached at module initialization
+//! - **Compile-time target arch detection**: Graceful fallback for non-x86_64
+//! - **Early SIMD exit**: Vectorized mismatch detection
+//! - **Software prefetching**: Improves memory locality in verification loops
 
 mod scalar;
 #[cfg(target_arch = "x86_64")]
 mod simd;
 
-// Note: verify_pattern is used internally by scanner, not exported publicly
-
 pub use verify::verify_pattern;
 
+/// x86_64 implementation with SIMD dispatching and CPU feature caching
+#[cfg(target_arch = "x86_64")]
 mod verify {
     use super::scalar::verify_pattern_scalar;
     #[cfg(target_arch = "x86_64")]
     use super::simd::{verify_pattern_avx2, verify_pattern_avx512};
     use crate::memory_aobscan::pattern::Pattern;
+    use std::sync::atomic::{AtomicBool, Ordering};
 
-    /// Verify pattern match at given buffer offset.
+    /// Cached flag indicating AVX-512 support
+    static AVX512_AVAILABLE: AtomicBool = AtomicBool::new(false);
+    /// Cached flag indicating AVX2 support
+    static AVX2_AVAILABLE: AtomicBool = AtomicBool::new(false);
+
+    /// Initializes CPU feature detection (once per process)
     ///
-    /// Automatically selects the best implementation based on:
-    /// 1. AVX-512 (64 bytes at once) - Fastest, if CPU supports it
-    /// 2. AVX2 (32 bytes at once) - Fast, for patterns >= 16 bytes
-    /// 3. Scalar with prefetching - Fallback for short patterns or old CPUs
+    /// Uses atomic compare-exchange to guarantee single initialization even
+    /// in multi-threaded scenarios.
+    fn init_cpu_features() {
+        static INIT: AtomicBool = AtomicBool::new(false);
+        if INIT.compare_exchange(false, true, Ordering::Acquire, Ordering::Relaxed).is_ok() {
+            if std::is_x86_feature_detected!("avx512f") {
+                AVX512_AVAILABLE.store(true, Ordering::Release);
+            }
+            if std::is_x86_feature_detected!("avx2") {
+                AVX2_AVAILABLE.store(true, Ordering::Release);
+            }
+        }
+    }
+
+    /// Verifies if a pattern matches the buffer at the given offset.
+    ///
+    /// Dispatches to appropriate implementation based on CPU features and pattern length.
     ///
     /// # Arguments
-    /// * `buffer` - The memory buffer read from target process
-    /// * `offset` - Offset within the buffer where pattern should start
-    /// * `pattern` - The pattern to verify
+    /// * `buffer` - Memory buffer to verify
+    /// * `offset` - Starting position in buffer
+    /// * `pattern` - Pattern to match
     ///
     /// # Returns
-    /// * `true` - Pattern matches at this offset
-    /// * `false` - Pattern does not match
+    /// `true` if pattern matches, `false` otherwise
     #[inline]
     pub fn verify_pattern(buffer: &[u8], offset: usize, pattern: &Pattern) -> bool {
-        // Priority 1: Use AVX-512 for patterns >= 32 bytes (avoid overhead for very short patterns)
-        #[cfg(target_arch = "x86_64")]
-        {
-            if pattern.bytes.len() >= 32 && std::is_x86_feature_detected!("avx512f") {
-                unsafe {
-                    return verify_pattern_avx512(buffer, offset, pattern);
-                }
-            }
+        init_cpu_features();
 
-            // Priority 2: Use AVX2 for patterns >= 16 bytes
-            if pattern.bytes.len() >= 16 && std::is_x86_feature_detected!("avx2") {
-                unsafe {
-                    return verify_pattern_avx2(buffer, offset, pattern);
-                }
+        let len = pattern.bytes.len();
+
+        if len >= 32 && AVX512_AVAILABLE.load(Ordering::Acquire) {
+            unsafe {
+                return verify_pattern_avx512(buffer, offset, pattern);
             }
         }
 
-        // Priority 3: Fallback to optimized scalar implementation
+        if len >= 16 && AVX2_AVAILABLE.load(Ordering::Acquire) {
+            unsafe {
+                return verify_pattern_avx2(buffer, offset, pattern);
+            }
+        }
+
+        verify_pattern_scalar(buffer, offset, pattern)
+    }
+}
+
+/// Fallback implementation for non-x86_64 architectures
+#[cfg(not(target_arch = "x86_64"))]
+mod verify {
+    use super::scalar::verify_pattern_scalar;
+    use crate::memory_aobscan::pattern::Pattern;
+
+    /// Verifies pattern match (scalar-only fallback)
+    #[inline]
+    pub fn verify_pattern(buffer: &[u8], offset: usize, pattern: &Pattern) -> bool {
         verify_pattern_scalar(buffer, offset, pattern)
     }
 }

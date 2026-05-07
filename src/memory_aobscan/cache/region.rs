@@ -1,6 +1,12 @@
-//! Memory region query module
+//! Memory Region Query & Cache
 //!
-//! Handles querying and filtering valid memory regions for scanning.
+//! Handles VirtualQueryEx calls to enumerate valid memory regions, with
+//! intelligent filtering and optional caching.
+//!
+//! # Filtering Rules
+//! - Skips NULL pointer guard page (0x0 - 0xFFFF)
+//! - Only includes committed, readable memory regions
+//! - Excludes guard pages that would trigger exceptions on access
 
 use std::sync::OnceLock;
 use windows::{
@@ -8,19 +14,19 @@ use windows::{
     Win32::System::Memory::{VirtualQueryEx, MEMORY_BASIC_INFORMATION},
 };
 
-/// Global cache for memory regions per process handle
+/// Global cache for memory regions per process handle.
 /// Key: Process handle (as usize), Value: Cached memory regions
 static REGION_CACHE: OnceLock<
     std::sync::Mutex<std::collections::HashMap<usize, Vec<(usize, usize)>>>,
 > = OnceLock::new();
 
-/// Get or initialize the region cache
+/// Gets or initializes the region cache.
 pub(crate) fn get_region_cache(
 ) -> &'static std::sync::Mutex<std::collections::HashMap<usize, Vec<(usize, usize)>>> {
     REGION_CACHE.get_or_init(|| std::sync::Mutex::new(std::collections::HashMap::new()))
 }
 
-/// Retrieves all valid memory regions for scanning with intelligent filtering and optional caching.
+/// Retrieves all valid memory regions for scanning with filtering and optional caching.
 ///
 /// Optimizes scanning by:
 /// 1. Skipping NULL pointer guard page (0x0 - 0xFFFF)
@@ -33,7 +39,7 @@ pub(crate) fn get_region_cache(
 /// * `use_cache` - Whether to use cached regions (true) or force fresh query (false)
 ///
 /// # Returns
-/// Vector of (base_address, size) tuples for scannable regions
+/// Vector of (base_address, size) tuples for scannable memory regions
 pub fn get_valid_memory_regions(handle: HANDLE, use_cache: bool) -> Vec<(usize, usize)> {
     let handle_key = handle.0 as usize;
 

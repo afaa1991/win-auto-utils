@@ -1,6 +1,6 @@
 [package]
 name = "win-auto-utils"
-version = "0.2.4"
+version = "0.2.5"
 edition = "2021"
 description = "Universal Windows automation utilities with memory, window, input, and color operations"
 authors = ["CC"]
@@ -237,15 +237,14 @@ script_process_context = [
 # Useful for any script engine usage, not just Windows automation
 scripts_control_flow = ["script_engine", "scripts_terminator"]
 
-# Script mode configuration instructions (script_mode)
-# Provides mode-based configuration for dynamic behavior switching
-scripts_mode = ["script_engine"]
-
 # Keyboard input instructions (key, key_down, key_up)
 scripts_keyboard = ["script_engine", "keyboard"]
 
-# Mouse input instructions (click, move)
+# Mouse input instructions (click, move, dbclick, etc.)
 scripts_mouse = ["script_engine", "mouse"]
+
+# Clipboard instructions (copy, paste)
+scripts_clipboard = ["script_engine", "clipboard", "keyboard"]
 
 # Timing instructions (sleep)
 scripts_timing = ["script_engine", "scripts_terminator", "utils_thread"]
@@ -256,18 +255,17 @@ scripts_terminator = []
 # Requires process_context for HWND support
 scripts_window = ["script_engine", "script_process_context", "window"]
 
-# Convenience features for keyboard/mouse with PostMessage support
-# These combine the base instruction sets with process_context for background mode
+# Convenience features for keyboard with PostMessage support (deprecated)
+# Note: scripts_mouse_with_post is removed as PostMessage mode is no longer supported
 scripts_keyboard_with_post = ["scripts_keyboard", "script_process_context"]
-scripts_mouse_with_post = ["scripts_mouse", "script_process_context"]
 
 # All built-in instructions (convenience feature)
 # Automatically enables all instruction categories
 scripts_builtin = [
     "scripts_control_flow",
-    "scripts_mode",
     "scripts_keyboard",
     "scripts_mouse",
+    "scripts_clipboard",
     "scripts_timing",
     "scripts_terminator",
     "scripts_window",
@@ -316,9 +314,8 @@ standard = [
     # All built-in instruction sets
     "scripts_builtin",
 
-    # Convenience features for PostMessage support
+    # Convenience feature for keyboard PostMessage support (deprecated)
     "scripts_keyboard_with_post",
-    "scripts_mouse_with_post",
 
     # Utility modules
     "utils",
@@ -389,3 +386,13 @@ required-features = ["process"]
 name = "aobscan_64bit_bytecode"
 path = "examples/aobscan_64bit_bytecode.rs"
 required-features = ["memory_aobscan"]
+
+[[example]]
+name = "keyboard_usage"
+path = "examples/keyboard_usage.rs"
+required-features = ["keyboard", "script_engine", "scripts_builtin"]
+
+[[example]]
+name = "mouse_usage"
+path = "examples/mouse_usage.rs"
+required-features = ["mouse", "script_engine", "scripts_builtin"]

@@ -1,11 +1,17 @@
-//! Anchor selection module
+//! Intelligent Anchor Selection
 //!
-//! Provides intelligent anchor byte/sequence selection for heuristic searching.
+//! Provides heuristic anchor selection to minimize false positives during scan.
+//! Selects rarest single byte or best multi-byte sequence based on rarity analysis.
+//!
+//! # Optimization Principles
+//! - **Rarest byte selection**: Reduces memchr false positives
+//! - **Multi-byte sequences**: Further reduces verification calls
+//! - **Consecutive bytes only**: For predictable offset relationships
 
 /// Finds the best multi-byte anchor sequence (2-4 consecutive known bytes).
 ///
-/// This optimizes search performance by reducing false positives from memchr.
-/// Uses rarity analysis to select the least common byte sequence.
+/// Optimizes search performance by selecting sequence with lowest total
+/// byte frequency to minimize false positives.
 ///
 /// # Arguments
 /// * `bytes` - Pattern byte array
@@ -48,7 +54,7 @@ pub fn find_best_anchor_sequence(bytes: &[u8], mask: &[bool]) -> Option<Vec<(usi
     best_sequence
 }
 
-/// Calculate rarity score for a byte sequence (lower = rarer = better).
+/// Calculates rarity score for a byte sequence (lower = rarer = better).
 ///
 /// Uses sum of individual byte frequencies as a simplified rarity metric.
 fn calculate_sequence_rarity(bytes: &[u8], mask: &[bool], sequence: &[(usize, u8)]) -> u32 {
@@ -58,7 +64,7 @@ fn calculate_sequence_rarity(bytes: &[u8], mask: &[bool], sequence: &[(usize, u8
         .sum()
 }
 
-/// Get frequency of a byte in the pattern (among known bytes only).
+/// Gets frequency of a byte in the pattern (among known bytes only).
 fn get_byte_frequency(bytes: &[u8], mask: &[bool], byte: u8) -> u32 {
     bytes
         .iter()
@@ -70,8 +76,8 @@ fn get_byte_frequency(bytes: &[u8], mask: &[bool], byte: u8) -> u32 {
 
 /// Finds the index of the most rare non-wildcard byte for heuristic searching.
 ///
-/// This optimizes search performance by minimizing false positives from memchr.
-/// Uses frequency analysis to select the byte that appears least often in the pattern.
+/// Optimizes search performance by minimizing false positives from memchr.
+/// Uses frequency analysis to select least common byte in pattern.
 ///
 /// # Arguments
 /// * `bytes` - Pattern byte array
@@ -83,12 +89,10 @@ fn get_byte_frequency(bytes: &[u8], mask: &[bool], byte: u8) -> u32 {
 ///
 /// # Example
 /// ```ignore
-/// // This function is used internally by the scanner module
-/// // It finds the rarest byte in a pattern to optimize search performance
 /// let bytes = vec![0x48, 0x89, 0x48, 0x55];
 /// let mask = vec![true, true, true, true];
 /// // 0x48 appears twice, 0x89 and 0x55 appear once
-/// // The function will return index of either 0x89 or 0x55 (the rarer ones)
+/// // Returns index of either 0x89 or 0x55 (the rarer ones)
 /// ```
 pub fn find_rarest_byte_index(bytes: &[u8], mask: &[bool]) -> Option<usize> {
     if bytes.is_empty() {

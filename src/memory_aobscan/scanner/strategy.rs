@@ -1,18 +1,40 @@
-//! Scanning strategy module
+//! Anchor-Based Scanning Strategies
 //!
-//! Implements different anchor-based scanning strategies.
+//! Implements heuristic scanning strategies using memchr to quickly locate candidate
+//! positions before verifying full pattern.
+//!
+//! # Strategies
+//! - **Single-byte anchor**: Uses rarest non-wildcard byte for minimal false positives
+//! - **Multi-byte anchor sequence**: Uses multiple non-wildcard bytes at known offsets for better precision
+//!
+//! Both strategies both use `memchr` crate for extremely fast byte searching, which uses
+//! CPU-specific vectorized implementations internally.
 
 use crate::memory_aobscan::pattern::Pattern;
 use crate::memory_aobscan::verifier::verify_pattern;
 use std::sync::atomic::{AtomicBool, Ordering};
 
-/// Enum to represent different anchor strategies
+/// Anchor search strategy descriptor.
 pub enum AnchorInfo {
-    SingleByte(usize, u8),       // (offset, byte)
-    MultiByte(Vec<(usize, u8)>), // [(offset, byte), ...]
+    /// Single-byte anchor with offset and value.
+    SingleByte(usize, u8),
+    /// Multi-byte anchor sequence with [(offset, byte) pairs.
+    MultiByte(Vec<(usize, u8)>),
 }
 
-/// Scan using multi-byte anchor sequence
+/// Scans buffer using multi-byte anchor sequence.
+///
+/// Uses first byte of anchor for fast memchr search, then verifies remaining
+/// anchor bytes at their offsets, then full pattern.
+///
+/// # Arguments
+/// * `buffer` - Memory buffer to scan
+/// * `anchor_info` - Multi-byte anchor sequence
+/// * `pattern` - Full pattern to verify
+/// * `results` - Vector to collect matches
+/// * `base_addr` - Base address of buffer in target process
+/// * `found_first` - Atomic flag to signal match found
+/// * `find_all` - Continue scanning or stop at first match
 pub fn scan_with_multi_byte_anchor(
     buffer: &[u8],
     anchor_info: &AnchorInfo,
@@ -45,9 +67,7 @@ pub fn scan_with_multi_byte_anchor(
                 let offset_diff = offset as isize - first_offset as isize;
                 let check_pos = global_pos as isize + offset_diff;
 
-                // FIX: Separate boundary checks to prevent unsigned integer overflow
-                // When check_pos is negative, check_pos as usize becomes a very large positive number
-                // This could bypass the boundary check and cause memory access violations
+                // Separate boundary checks to prevent unsigned overflow
                 if check_pos < 0 || check_pos as usize >= buffer.len() {
                     all_match = false;
                     break;
@@ -59,11 +79,8 @@ pub fn scan_with_multi_byte_anchor(
             }
 
             if all_match {
-                
-                // FIX: Prevent negative pattern_start calculation
-                // When global_pos < first_offset, pattern_start would be negative
-                // Converting negative usize causes integer overflow and invalid memory access
-                // This occurs when anchor is found in buffer's beginning but pattern can't fit
+
+                // Prevent negative pattern_start calculation
                 if global_pos < first_offset {
                     search_start = global_pos + 1;
                     continue;
@@ -90,7 +107,18 @@ pub fn scan_with_multi_byte_anchor(
     }
 }
 
-/// Scan using traditional single-byte memchr
+/// Scans buffer using traditional single-byte anchor + memchr.
+///
+/// Uses memchr finds positions of anchor byte, then verifies full pattern.
+///
+/// # Arguments
+/// * `buffer` - Memory buffer to scan
+/// * `anchor_info` - Single-byte anchor (offset, byte)
+/// * `pattern` - Full pattern to verify
+/// * `results` - Vector to collect matches
+/// * `base_addr` - Base address of buffer in target process
+/// * `found_first` - Atomic flag to signal match found
+/// * `find_all` - Continue scanning or stop at first match
 pub fn scan_with_single_byte_anchor(
     buffer: &[u8],
     anchor_info: &AnchorInfo,
