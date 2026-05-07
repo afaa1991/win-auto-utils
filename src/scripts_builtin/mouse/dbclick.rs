@@ -1,10 +1,15 @@
-//! Mouse scroll down instruction handler
+//! Mouse double-click instruction handler
 //!
-//! Implements the `scrolldown` instruction for scrolling the mouse wheel downward.
+//! Implements the `dbclick` instruction for performing double-clicks.
 //!
-//! # Execution Behavior
-//! Moves cursor to (x, y) if coordinates provided, then scrolls the wheel down by the specified number of notches.
-//! Each notch scrolls 120 units (one "line" by Windows conventions).
+//! # Execution Sequence
+//! 1. Move cursor to (x, y) if coordinates provided (with window offset if hwnd set)
+//! 2. Press left button (MOUSEDOWN)
+//! 3. Release left button (MOUSEUP)
+//! 4. Wait 50ms (inter-click delay)
+//! 5. Press left button (MOUSEDOWN)
+//! 6. Release left button (MOUSEUP)
+//! 7. Wait for `delay_ms` milliseconds (if specified)
 //!
 //! # Coordinate System
 //!
@@ -13,70 +18,65 @@
 //!
 //! # Syntax
 //! ```text
-//! scrolldown [x] [y] [times]
+//! dbclick [x] [y] [delay_ms]
 //! ```
 //!
 //! # Arguments
-//! - `x` (optional): X coordinate to move cursor before scrolling
-//! - `y` (optional): Y coordinate to move cursor before scrolling
-//! - `times` (optional): Number of notches to scroll. Default is 1. Valid range: 1-100
+//! - `x` (optional): X coordinate. If omitted, double-clicks at current position
+//! - `y` (optional): Y coordinate. Required if x is provided
+//! - `delay_ms` (optional): Milliseconds to wait after the second click. Default is 0
 //!
 //! # Examples
 //! ```text
-//! scrolldown                    # Scroll down 1 notch at current position
-//! scrolldown 3                  # Scroll down 3 notches at current position
-//! scrolldown 100 200            # Move to (100, 200) then scroll down 1 notch
-//! scrolldown 100 200 5          # Move to (100, 200) then scroll down 5 notches
+//! dbclick                      # Double-click at current position
+//! dbclick 100 200             # Double-click at (100, 200)
+//! dbclick 50 50 100            # Double-click at (50, 50) with 100ms delay after
 //! ```
 //!
 //! # Errors
 //! - Negative coordinates are rejected during parse
-//! - Times must be between 1 and 100
+//! - Execution errors occur if SetCursorPos or SendInput fails
 
 use crate::mouse::mouse_input;
 use crate::script_engine::instruction::{
     InstructionData, InstructionHandler, InstructionMetadata, ScriptError,
 };
 use crate::script_engine::VMContext;
-use windows::Win32::UI::Input::KeyboardAndMouse::INPUT;
+use crate::utils::sleep_ms;
 
 #[derive(Clone)]
-pub struct ScrollDownParams {
+pub struct DbClickParams {
     pub x: Option<i32>,
     pub y: Option<i32>,
-    pub times: u32,
-    pub scroll_input: INPUT,
+    pub delay_ms: u32,
 }
 
-pub struct ScrollDownHandler;
+pub struct DbClickHandler;
 
-impl InstructionHandler for ScrollDownHandler {
+impl InstructionHandler for DbClickHandler {
     fn name(&self) -> &str {
-        "scrolldown"
+        "dbclick"
     }
 
     #[inline]
     fn parse(&self, args: &[&str]) -> Result<InstructionData, ScriptError> {
         let mut x: Option<i32> = None;
         let mut y: Option<i32> = None;
-        let mut times: u32 = 1;
+        let mut delay_ms: u32 = 0;
 
         match args.len() {
             0 => {}
             1 => {
-                if let Ok(val) = args[0].parse::<u32>() {
-                    times = val;
-                } else if let Ok(val) = args[0].parse::<i32>() {
-                    if val >= 0 {
-                        times = val as u32;
-                    } else {
+                if let Ok(val) = args[0].parse::<i32>() {
+                    if val < 0 {
                         return Err(ScriptError::ParseError(
-                            "Scroll times must be positive".into(),
+                            format!("Coordinates cannot be negative: {}", val).into(),
                         ));
                     }
+                    x = Some(val);
                 } else {
                     return Err(ScriptError::ParseError(
-                        format!("Invalid argument '{}'. Expected: scrolldown [x] [y] [times]", args[0]).into(),
+                        format!("Invalid argument '{}'. Expected dbclick [x] [y] [delay_ms]", args[0]).into(),
                     ));
                 }
             }
@@ -90,7 +90,7 @@ impl InstructionHandler for ScrollDownHandler {
                     x = Some(val);
                 } else {
                     return Err(ScriptError::ParseError(
-                        format!("Invalid argument '{}'. Expected: scrolldown [x] [y] [times]", args[0]).into(),
+                        format!("Invalid argument '{}'. Expected dbclick [x] [y] [delay_ms]", args[0]).into(),
                     ));
                 }
                 if let Ok(val) = args[1].parse::<i32>() {
@@ -102,7 +102,7 @@ impl InstructionHandler for ScrollDownHandler {
                     y = Some(val);
                 } else {
                     return Err(ScriptError::ParseError(
-                        format!("Invalid argument '{}'. Expected: scrolldown [x] [y] [times]", args[1]).into(),
+                        format!("Invalid argument '{}'. Expected dbclick [x] [y] [delay_ms]", args[1]).into(),
                     ));
                 }
             }
@@ -116,7 +116,7 @@ impl InstructionHandler for ScrollDownHandler {
                     x = Some(val);
                 } else {
                     return Err(ScriptError::ParseError(
-                        format!("Invalid argument '{}'. Expected: scrolldown [x] [y] [times]", args[0]).into(),
+                        format!("Invalid argument '{}'. Expected dbclick [x] [y] [delay_ms]", args[0]).into(),
                     ));
                 }
                 if let Ok(val) = args[1].parse::<i32>() {
@@ -128,14 +128,14 @@ impl InstructionHandler for ScrollDownHandler {
                     y = Some(val);
                 } else {
                     return Err(ScriptError::ParseError(
-                        format!("Invalid argument '{}'. Expected: scrolldown [x] [y] [times]", args[1]).into(),
+                        format!("Invalid argument '{}'. Expected dbclick [x] [y] [delay_ms]", args[1]).into(),
                     ));
                 }
                 if let Ok(val) = args[2].parse::<u32>() {
-                    times = val;
+                    delay_ms = val;
                 } else if let Ok(val) = args[2].parse::<i32>() {
                     if val >= 0 {
-                        times = val as u32;
+                        delay_ms = val as u32;
                     }
                 }
             }
@@ -149,18 +149,7 @@ impl InstructionHandler for ScrollDownHandler {
             }
         }
 
-        if times < 1 || times > 100 {
-            return Err(ScriptError::ParseError(
-                "Scroll times must be between 1 and 100".into(),
-            ));
-        }
-
-        Ok(InstructionData::Custom(Box::new(ScrollDownParams {
-            x,
-            y,
-            times,
-            scroll_input: mouse_input::build_scroll_down(120),
-        })))
+        Ok(InstructionData::Custom(Box::new(DbClickParams { x, y, delay_ms })))
     }
 
     #[inline]
@@ -170,8 +159,9 @@ impl InstructionHandler for ScrollDownHandler {
         data: &InstructionData,
         _metadata: Option<&InstructionMetadata>,
     ) -> Result<(), ScriptError> {
-        let params = data.extract_custom::<ScrollDownParams>("Invalid scroll parameters")?;
+        let params = data.extract_custom::<DbClickParams>("Invalid dbclick parameters")?;
 
+        // Move to position if coordinates provided
         if let (Some(x), Some(y)) = (params.x, params.y) {
             // Apply window offset if window geometry is available
             let (screen_x, screen_y) = match vm.process.window_geometry {
@@ -184,10 +174,21 @@ impl InstructionHandler for ScrollDownHandler {
             })?;
         }
 
-        for _ in 0..params.times {
-            mouse_input::execute_single_input(&params.scroll_input).map_err(|e| {
-                ScriptError::ExecutionError(format!("Scroll down failed: {:?}", e))
-            })?;
+        // Execute first click
+        let click_inputs = mouse_input::build_click_left();
+        mouse_input::execute_inputs(&click_inputs).map_err(|e| {
+            ScriptError::ExecutionError(format!("Double-click failed: {:?}", e))
+        })?;
+
+        sleep_ms(50);
+
+        // Execute second click
+        mouse_input::execute_inputs(&click_inputs).map_err(|e| {
+            ScriptError::ExecutionError(format!("Double-click failed: {:?}", e))
+        })?;
+
+        if params.delay_ms > 0 {
+            sleep_ms(params.delay_ms);
         }
 
         Ok(())

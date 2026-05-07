@@ -1,4 +1,4 @@
-# 模板匹配器 (Template Matcher - Image Template Matching)
+﻿# 模板匹配器 (Template Matcher - Image Template Matching)
 
 [English](../../en/modules/template_matcher.md) | [返回概览](overview.md)
 
@@ -8,7 +8,7 @@
 
 ```toml
 [dependencies]
-win-auto-utils = { version = "0.2.3", features = ["template_matcher"] }
+win-auto-utils = { version = "0.2.6", features = ["template_matcher"] }
 ```
 
 **平台**: 仅 Windows（需要 DXGI 支持）

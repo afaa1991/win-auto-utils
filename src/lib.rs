@@ -83,7 +83,6 @@ pub mod script_engine;
     feature = "scripts_keyboard",
     feature = "scripts_mouse",
     feature = "scripts_timing",
-    feature = "scripts_mode",
 ))]
 pub mod scripts_builtin;
 

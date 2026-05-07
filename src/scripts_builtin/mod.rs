@@ -77,10 +77,10 @@ use crate::script_engine::InstructionHandler;
 mod control_flow;
 #[cfg(feature = "scripts_keyboard")]
 mod keyboard;
-#[cfg(feature = "scripts_mode")]
-mod mode;
 #[cfg(feature = "scripts_mouse")]
-pub mod mouse; // Changed to pub mod to expose the module
+pub mod mouse;
+#[cfg(feature = "scripts_clipboard")]
+mod clipboard;
 #[cfg(feature = "scripts_terminator")]
 mod terminator;
 #[cfg(feature = "scripts_timing")]
@@ -135,48 +135,17 @@ impl InstructionBuilder {
         self
     }
 
-    /// Add script mode configuration instructions (mode)
-    ///
-    /// Provides key-value based configuration that affects how other instructions behave.
-    /// Each module defines its own mode keys for independent configuration.
-    ///
-    /// # Examples
-    /// ```text
-    /// mode input_mode post     # Set keyboard/mouse to background mode
-    /// key A                    # Automatically uses PostMessage
-    /// click 100 200            # Automatically uses PostMessage
-    ///
-    /// mode input_mode send     # Switch to foreground mode
-    /// key B                    # Automatically uses SendInput
-    /// ```
-    ///
-    ///
-    /// # Requirements
-    /// Requires the `scripts_mode` feature to be enabled.
-    #[cfg(feature = "scripts_mode")]
-    pub fn with_mode(mut self) -> Self {
-        self.handlers.push(Box::new(mode::ModeHandler));
-        self
-    }
-
     /// Add keyboard instructions (key, key_down, key_up)
     ///
-    /// These instructions support both foreground (SendInput) and background (PostMessage) modes.
-    /// Parameters are position-based for simplicity: `key <name> [delay_ms] [mode]`
+    /// Parameters: `key <name> [delay_ms]`
     ///
     /// # Examples
     /// ```text
-    /// key A                    # Click 'A' in foreground (default mode: send)
-    /// key A 50                 # Click 'A' with 50ms delay between press and release
-    /// key A post               # Click 'A' in background
-    /// key A 50 post            # Click 'A' in background with 50ms delay
-    /// key_down SHIFT           # Press SHIFT (hold without release)
-    /// key_up SHIFT post        # Release SHIFT in background
+    /// key A                    # Click 'A'
+    /// key A 50                 # Click 'A' with 50ms delay
+    /// key_down SHIFT           # Press SHIFT
+    /// key_up SHIFT             # Release SHIFT
     /// ```
-    ///
-    /// # Execution Behavior
-    /// - `key`: Performs complete click (press → delay → release)
-    /// - `key_down`: Only presses the key (no automatic release)
     /// - `key_up`: Only releases the key
     ///
     /// # Requirements
@@ -209,6 +178,28 @@ impl InstructionBuilder {
         self.handlers.push(Box::new(mouse::ScrollDownHandler));
         self.handlers.push(Box::new(mouse::PressHandler));
         self.handlers.push(Box::new(mouse::ReleaseHandler));
+        self
+    }
+
+    /// Add clipboard instructions (copy, paste)
+    ///
+    /// These instructions provide clipboard automation capabilities:
+    /// - copy: Copy text to clipboard
+    /// - paste: Paste clipboard content via Ctrl+V
+    ///
+    /// # Examples
+    /// ```text
+    /// copy Hello World        # Copy text to clipboard
+    /// paste                   # Paste with default 20ms delay
+    /// paste 50                # Paste with 50ms delay
+    /// ```
+    ///
+    /// # Requirements
+    /// Requires the `scripts_clipboard` feature to be enabled (which includes clipboard + keyboard).
+    #[cfg(feature = "scripts_clipboard")]
+    pub fn with_clipboard(mut self) -> Self {
+        self.handlers.push(Box::new(clipboard::CopyHandler));
+        self.handlers.push(Box::new(clipboard::PasteHandler));
         self
     }
 
@@ -297,11 +288,6 @@ impl BuiltinInstructions {
             builder = builder.with_control_flow();
         }
 
-        #[cfg(feature = "scripts_mode")]
-        {
-            builder = builder.with_mode();
-        }
-
         #[cfg(feature = "scripts_keyboard")]
         {
             builder = builder.with_keyboard();
@@ -310,6 +296,11 @@ impl BuiltinInstructions {
         #[cfg(feature = "scripts_mouse")]
         {
             builder = builder.with_mouse();
+        }
+
+        #[cfg(feature = "scripts_clipboard")]
+        {
+            builder = builder.with_clipboard();
         }
 
         #[cfg(feature = "scripts_timing")]
@@ -402,11 +393,6 @@ pub fn register_all(registry: &mut crate::script_engine::instruction::Instructio
         registry.register(control_flow::BreakHandler).ok();
     }
 
-    #[cfg(feature = "scripts_mode")]
-    {
-        registry.register(mode::ModeHandler).ok();
-    }
-
     #[cfg(feature = "scripts_keyboard")]
     {
         registry.register(keyboard::KeyClickHandler).ok();
@@ -414,9 +400,16 @@ pub fn register_all(registry: &mut crate::script_engine::instruction::Instructio
         registry.register(keyboard::KeyUpHandler).ok();
     }
 
+    #[cfg(feature = "scripts_clipboard")]
+    {
+        registry.register(clipboard::CopyHandler).ok();
+        registry.register(clipboard::PasteHandler).ok();
+    }
+
     #[cfg(feature = "scripts_mouse")]
     {
         registry.register(mouse::ClickHandler).ok();
+        registry.register(mouse::DbClickHandler).ok();
         registry.register(mouse::MoveHandler).ok();
         registry.register(mouse::MoveRelHandler).ok();
         registry.register(mouse::ScrollUpHandler).ok();

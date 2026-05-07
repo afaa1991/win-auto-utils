@@ -1,60 +1,77 @@
 //! Key click instruction handler
 //!
 //! Implements the `key` instruction for complete keyboard click operations.
-//! Performs press → delay (optional) → release sequence.
+//!
+//! # Execution Sequence (Send Mode)
+//! 1. Press key down (KEYEVENTF_KEYDOWN)
+//! 2. Wait for `delay_ms` milliseconds
+//! 3. Release key up (KEYEVENTF_KEYUP)
+//!
+//! # Execution Mode (Post Mode)
+//! 1. Send WM_KEYDOWN message
+//! 2. Wait for `delay_ms` milliseconds
+//! 3. Send WM_KEYUP message
+//!
+//! # Execution Modes
+//!
+//! ## `send` - Foreground Mode (Default)
+//! Simulates input to the active window using SendInput API.
+//! - No target window configuration needed
+//! - Works with the currently focused application
+//!
+//! ## `post` - Background Mode
+//! Sends messages directly to a specific window using PostMessage API.
+//! - Requires `target_hwnd` to be set via `process.set_hwnd()` before execution
+//! - Works even when window is not in focus
+//!
+//! # Syntax
+//! ```text
+//! key <key_name> [delay_ms] [mode]
+//! ```
+//!
+//! # Arguments
+//! - `key_name` (required): Key name (e.g., A, ENTER, F1, SHIFT, CONTROL)
+//! - `delay_ms` (optional): Milliseconds to wait between press and release. Default is 0
+//! - `mode` (optional): Either `send` (default) or `post`
+//!
+//! # Key Names
+//! - Letters: A-Z, a-z
+//! - Numbers: 0-9
+//! - Function keys: F1-F12
+//! - Special: ENTER, TAB, ESCAPE, SPACE, BACKSPACE, DELETE
+//! - Arrows: UP, DOWN, LEFT, RIGHT, HOME, END, PAGEUP, PAGEDOWN
+//! - Modifiers: SHIFT, CONTROL, CTRL, ALT, MENU
+//! - Others: INSERT, PRINTSCREEN, PAUSE, CAPSLOCK
+//!
+//! # Examples
+//! ```text
+//! key A                        # Press and release 'A' in foreground
+//! key ENTER 50                 # Press ENTER with 50ms delay
+//! key A post                   # Press 'A' in background (requires hwnd)
+//! key SHIFT post               # Press SHIFT in background
+//! ```
+//!
+//! # Key Combinations
+//! ```text
+//! key_down SHIFT
+//! key A
+//! key_up SHIFT
+//! ```
+//!
+//! # Errors
+//! - Unknown key names are rejected during parse
+//! - Invalid mode values are rejected during parse
+//! - Post mode without hwnd set fails at execution
 
-use super::KeyParams;
 use crate::keyboard::keyboard_input;
-#[cfg(feature = "script_process_context")]
 use crate::keyboard::keyboard_message;
 use crate::script_engine::instruction::{
     InstructionData, InstructionHandler, InstructionMetadata, ScriptError,
 };
 use crate::script_engine::VMContext;
-use crate::scripts_builtin::keyboard::{parse_key_args, KeyMode};
-
+use crate::scripts_builtin::keyboard::KeyParams;
 use crate::utils::sleep_ms;
 
-/// Key click handler (complete press + delay + release operation)
-///
-/// Syntax: `key <key_name> [delay_ms] [mode]`
-///
-/// # Parameter Parsing Rules
-///
-/// The parser uses intelligent type inference for optimal performance:
-/// - **Position 1** (required): Key name (e.g., A, ENTER, SPACE)
-/// - **Position 2** (optional): Delay in milliseconds (number) OR mode ('send'/'post')
-/// - **Position 3** (optional): Mode (only if position 2 is a number)
-///
-/// # Examples
-/// ```text
-/// key A                    # Click 'A' in foreground (default mode: send, no delay)
-/// key A 50                 # Click 'A' with 50ms delay between press and release
-/// key A post               # Click 'A' in background (no delay)
-/// key A 50 post            # Click 'A' in background with 50ms delay
-/// key A send               # Click 'A' in foreground (explicit mode)
-/// ```
-///
-/// # Smart Type Inference
-///
-/// The parser automatically detects parameter types:
-/// - If position 2 is a **number** treated as delay, position 3 can be mode
-/// - If position 2 is **'send'/'post'** treated as mode, no position 3 allowed
-///
-/// Valid patterns:
-/// ```text
-/// key A 50 post     Valid: 50 is number (delay), post is mode
-/// key A post        Valid: post is mode (position 2)
-/// key A post 50     Invalid: Cannot have parameter after mode at position 2
-/// ```
-///
-/// # Execution Behavior
-/// This instruction performs a complete click operation:
-/// 1. Press the key (KEYDOWN)
-/// 2. Wait for delay_ms milliseconds (if specified)
-/// 3. Release the key (KEYUP)
-///
-/// For holding keys without automatic release, use `key_down` and `key_up` separately.
 pub struct KeyClickHandler;
 
 impl InstructionHandler for KeyClickHandler {
@@ -63,17 +80,7 @@ impl InstructionHandler for KeyClickHandler {
     }
 
     fn parse(&self, args: &[&str]) -> Result<InstructionData, ScriptError> {
-        let mut params = parse_key_args(args)?;
-
-        // Pre-build INPUT structures based on mode (zero runtime overhead)
-        if params.mode == KeyMode::Send {
-            // For key_click: pre-build complete click sequence [KEYDOWN, KEYUP]
-            params.send_inputs =
-                keyboard_input::build_key_click_inputs(params.vk_code, params.extended).to_vec();
-        }
-        // PostMessage mode keeps send_inputs empty
-
-        // Store parameters in Custom data
+        let params = crate::scripts_builtin::keyboard::parse_key_click_args(args)?;
         Ok(InstructionData::Custom(Box::new(params)))
     }
 
@@ -85,239 +92,44 @@ impl InstructionHandler for KeyClickHandler {
     ) -> Result<(), ScriptError> {
         let params = data.extract_custom::<KeyParams>("Invalid key parameters")?;
 
-        // Determine effective mode with priority: explicit > input_mode from VM > hardcoded default
-        let effective_mode = if params.mode_specified {
-            params.mode
-        } else {
-            // Apply input mode from VM context
-            match super::get_input_mode(vm).as_str() {
-                "post" => KeyMode::Post,
-                _ => KeyMode::Send, // Default to send
+        match params {
+            KeyParams::SendClick(p) => {
+                keyboard_input::execute_single_input(&p.key_down_input).map_err(|e| {
+                    ScriptError::ExecutionError(format!("Key down failed: {:?}", e))
+                })?;
+                if p.delay_ms > 0 {
+                    sleep_ms(p.delay_ms);
+                }
+                keyboard_input::execute_single_input(&p.key_up_input).map_err(|e| {
+                    ScriptError::ExecutionError(format!("Key up failed: {:?}", e))
+                })?;
             }
-        };
+            KeyParams::PostClick(p) => {
+                let hwnd = vm.process.hwnd.ok_or_else(|| {
+                    ScriptError::ExecutionError(
+                        "PostMessage mode requires hwnd to be set via process.set_hwnd()".into(),
+                    )
+                })?;
 
-        match effective_mode {
-            KeyMode::Send => {
-                // SendInput mode does NOT require target_hwnd
-                if params.delay_ms > 0 {
-                    // Execute with delay: use pre-built inputs separately
-                    // params.send_inputs contains [down_input, up_input] (pre-built at parse time)
-                    if params.send_inputs.len() >= 2 {
-                        // Execute KEYDOWN (first input)
-                        keyboard_input::execute_single_input(&params.send_inputs[0]).map_err(
-                            |e| {
-                                ScriptError::ExecutionError(format!(
-                                    "SendInput press failed: {:?}",
-                                    e
-                                ))
-                            },
-                        )?;
-
-                        // Apply delay using optimized utility function
-                        sleep_ms(params.delay_ms);
-
-                        // Execute KEYUP (second input)
-                        keyboard_input::execute_single_input(&params.send_inputs[1]).map_err(
-                            |e| {
-                                ScriptError::ExecutionError(format!(
-                                    "SendInput release failed: {:?}",
-                                    e
-                                ))
-                            },
-                        )?;
-                    } else {
-                        return Err(ScriptError::ExecutionError(
-                            "Invalid pre-built inputs: expected 2 inputs for delayed click".into(),
-                        ));
-                    }
-                } else {
-                    // No delay - execute pre-built inputs atomically (zero overhead)
-                    keyboard_input::execute_inputs(&params.send_inputs).map_err(|e| {
-                        ScriptError::ExecutionError(format!("SendInput click failed: {:?}", e))
+                keyboard_message::post_key_down_atomic(hwnd, p.vk_code, p.scan_code)
+                    .map_err(|e| {
+                        ScriptError::ExecutionError(format!("PostMessage key down failed: {:?}", e))
                     })?;
+                if p.delay_ms > 0 {
+                    sleep_ms(p.delay_ms);
                 }
+                keyboard_message::post_key_up_atomic(hwnd, p.vk_code, p.scan_code)
+                    .map_err(|e| {
+                        ScriptError::ExecutionError(format!("PostMessage key up failed: {:?}", e))
+                    })?;
             }
-            KeyMode::Post => {
-                #[cfg(feature = "script_process_context")]
-                {
-                    // PostMessage mode requires target window handle
-                    let hwnd = vm.process.get_hwnd_or_err()?;
-
-                    if params.delay_ms > 0 {
-                        // Execute KEYDOWN
-                        keyboard_message::post_key_down_atomic(
-                            hwnd,
-                            params.vk_code,
-                            params.scan_code,
-                        );
-
-                        // Apply delay using optimized utility function
-                        sleep_ms(params.delay_ms);
-
-                        // Execute KEYUP
-                        keyboard_message::post_key_up_atomic(
-                            hwnd,
-                            params.vk_code,
-                            params.scan_code,
-                        );
-                    } else {
-                        // No delay - atomic click
-                        keyboard_message::post_key_click_atomic(
-                            hwnd,
-                            params.vk_code,
-                            params.scan_code,
-                        );
-                    }
-                }
-
-                #[cfg(not(feature = "script_process_context"))]
-                {
-                    return Err(ScriptError::ExecutionError(
-                        "PostMessage mode requires 'script_process_context' feature. \
-                         Enable it in Cargo.toml: features = [\"scripts_keyboard_with_post\"] \
-                         or use SendInput mode (default)."
-                            .into(),
-                    ));
-                }
+            _ => {
+                return Err(ScriptError::ExecutionError(
+                    "Invalid key parameters for click".into(),
+                ));
             }
         }
 
         Ok(())
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn test_parse_key_with_delay_and_mode() {
-        let handler = KeyClickHandler;
-
-        // Test: key A 50 post (delay at position 2, mode at position 3)
-        let result = handler.parse(&["A", "50", "post"]).unwrap();
-        match result {
-            InstructionData::Custom(boxed) => {
-                let params = boxed.downcast_ref::<KeyParams>().unwrap();
-                assert_eq!(params.vk_code, 0x41); // 'A' key
-                assert!(params.scan_code > 0); // Scan code should be pre-computed
-                assert_eq!(params.mode, KeyMode::Post);
-                assert_eq!(params.delay_ms, 50);
-            }
-            _ => panic!("Expected Custom data"),
-        }
-    }
-
-    #[test]
-    fn test_parse_key_default_values() {
-        let handler = KeyClickHandler;
-        let result = handler.parse(&["ENTER"]).unwrap();
-
-        match result {
-            InstructionData::Custom(boxed) => {
-                let params = boxed.downcast_ref::<KeyParams>().unwrap();
-                assert_eq!(params.vk_code, 0x0D); // VK_RETURN
-                assert!(params.scan_code > 0); // Pre-computed scan code
-                assert_eq!(params.mode, KeyMode::Send); // Default foreground
-                assert_eq!(params.delay_ms, 0); // Default no delay
-            }
-            _ => panic!("Expected Custom data"),
-        }
-    }
-
-    #[test]
-    fn test_parse_key_only_delay() {
-        let handler = KeyClickHandler;
-        let result = handler.parse(&["SPACE", "100"]).unwrap();
-
-        match result {
-            InstructionData::Custom(boxed) => {
-                let params = boxed.downcast_ref::<KeyParams>().unwrap();
-                assert_eq!(params.vk_code, 0x20); // VK_SPACE
-                assert_eq!(params.mode, KeyMode::Send); // Default foreground
-                assert_eq!(params.delay_ms, 100);
-            }
-            _ => panic!("Expected Custom data"),
-        }
-    }
-
-    #[test]
-    fn test_parse_key_only_mode() {
-        let handler = KeyClickHandler;
-        let result = handler.parse(&["TAB", "post"]).unwrap();
-
-        match result {
-            InstructionData::Custom(boxed) => {
-                let params = boxed.downcast_ref::<KeyParams>().unwrap();
-                assert_eq!(params.vk_code, 0x09); // VK_TAB
-                assert_eq!(params.mode, KeyMode::Post);
-                assert_eq!(params.delay_ms, 0);
-            }
-            _ => panic!("Expected Custom data"),
-        }
-    }
-
-    #[test]
-    fn test_parse_key_explicit_send_mode() {
-        let handler = KeyClickHandler;
-        let result = handler.parse(&["A", "send"]).unwrap();
-
-        match result {
-            InstructionData::Custom(boxed) => {
-                let params = boxed.downcast_ref::<KeyParams>().unwrap();
-                assert_eq!(params.vk_code, 0x41);
-                assert_eq!(params.mode, KeyMode::Send);
-                assert_eq!(params.delay_ms, 0);
-            }
-            _ => panic!("Expected Custom data"),
-        }
-    }
-
-    #[test]
-    fn test_prebuilt_inputs_are_complete() {
-        let handler = KeyClickHandler;
-
-        // Test case 1: No delay - should have 2 inputs (down + up)
-        let result = handler.parse(&["A"]).unwrap();
-        match result {
-            InstructionData::Custom(boxed) => {
-                let params = boxed.downcast_ref::<KeyParams>().unwrap();
-                assert_eq!(
-                    params.send_inputs.len(),
-                    2,
-                    "Should pre-build both down and up inputs"
-                );
-            }
-            _ => panic!("Expected Custom data"),
-        }
-
-        // Test case 2: With delay - should ALSO have 2 inputs (down + up) for zero runtime allocation
-        let result = handler.parse(&["A", "50"]).unwrap();
-        match result {
-            InstructionData::Custom(boxed) => {
-                let params = boxed.downcast_ref::<KeyParams>().unwrap();
-                assert_eq!(
-                    params.send_inputs.len(),
-                    2,
-                    "Should pre-build both down and up inputs even with delay"
-                );
-                assert_eq!(params.delay_ms, 50);
-            }
-            _ => panic!("Expected Custom data"),
-        }
-
-        // Test case 3: PostMessage mode - should have 0 inputs
-        let result = handler.parse(&["A", "post"]).unwrap();
-        match result {
-            InstructionData::Custom(boxed) => {
-                let params = boxed.downcast_ref::<KeyParams>().unwrap();
-                assert_eq!(
-                    params.send_inputs.len(),
-                    0,
-                    "PostMessage mode should not pre-build INPUT structures"
-                );
-            }
-            _ => panic!("Expected Custom data"),
-        }
     }
 }

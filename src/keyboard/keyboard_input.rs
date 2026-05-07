@@ -179,6 +179,28 @@ impl SendInputKeyboard {
         Ok(())
     }
 
+    /// Press a key by name (convenience method with string lookup)
+    pub fn press(&self, key: &str) -> Result<(), SendKeyBoardInputError> {
+        let vk_code = key_code(key);
+        if vk_code == 0 {
+            return Err(SendKeyBoardInputError::SendInputFailed);
+        }
+
+        let extended = crate::utils::key_code::is_extended_key(vk_code as u8);
+        self.press_with_vk(vk_code as u8, extended)
+    }
+
+    /// Release a key by name (convenience method with string lookup)
+    pub fn release(&self, key: &str) -> Result<(), SendKeyBoardInputError> {
+        let vk_code = key_code(key);
+        if vk_code == 0 {
+            return Err(SendKeyBoardInputError::SendInputFailed);
+        }
+
+        let extended = crate::utils::key_code::is_extended_key(vk_code as u8);
+        self.release_with_vk(vk_code as u8, extended)
+    }
+
     /// Press a key by VK code (lower overhead than string version)
     pub fn press_with_vk(&self, vk_code: u8, extended: bool) -> Result<(), SendKeyBoardInputError> {
         let input = build_key_down_input(vk_code, extended);

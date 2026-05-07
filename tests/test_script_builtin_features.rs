@@ -368,36 +368,7 @@ end
 // Mode Configuration Tests (requires: scripts_mode)
 // ============================================================================
 
-#[cfg(feature = "scripts_mode")]
-#[test]
-fn test_mode_input_mode_switching() {
-    println!("\n=== Mode: Input Mode Switching ===");
-
-    // This test requires keyboard instructions to demonstrate mode switching
-    #[cfg(feature = "scripts_keyboard")]
-    {
-        let engine = create_full_engine();
-        // Only test send mode since post mode requires window handle setup
-        let script = r#"mode input_mode send
-key A
-key B
-key C
-"#;
-
-        let compiled = engine.compile(script).unwrap();
-        engine.execute(&compiled).unwrap();
-
-        println!("✅ Mode switching executed successfully (send mode only)");
-    }
-
-    #[cfg(not(feature = "scripts_keyboard"))]
-    {
-        println!("⚠️  Skipping mode test: scripts_keyboard feature not enabled");
-        println!("   Mode instruction requires keyboard/mouse to demonstrate effect");
-    }
-}
-
-#[cfg(all(feature = "scripts_mode", feature = "scripts_keyboard"))]
+#[cfg(all(feature = "scripts_mouse", feature = "scripts_keyboard"))]
 #[test]
 fn test_mode_affects_keyboard() {
     println!("\n=== Mode: Mode Affects Keyboard Instructions ===");
@@ -415,7 +386,7 @@ key B send
     println!("✅ Mode correctly affects keyboard instructions (send mode only)");
 }
 
-#[cfg(all(feature = "scripts_mode", feature = "scripts_mouse"))]
+#[cfg(all(feature = "scripts_mouse", feature = "scripts_mouse"))]
 #[test]
 fn test_mode_affects_mouse() {
     println!("\n=== Mode: Mode Affects Mouse Instructions ===");
@@ -494,8 +465,7 @@ end
     feature = "scripts_control_flow",
     feature = "scripts_keyboard",
     feature = "scripts_mouse",
-    feature = "scripts_timing",
-    feature = "scripts_mode"
+    feature = "scripts_timing"
 ))]
 #[test]
 fn test_integration_complex_automation_script() {

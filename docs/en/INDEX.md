@@ -1,4 +1,4 @@
-# Documentation Index
+﻿# Documentation Index
 
 Welcome to the win-auto-utils documentation! This index helps you find the right documentation for your needs.
 

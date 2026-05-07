@@ -1,4 +1,4 @@
-# Script Engine
+﻿# Script Engine
 
 [中文文档](../../zh/modules/script_engine.md) | [Back to Overview](overview.md)
 
@@ -8,7 +8,7 @@ The `script_engine` module provides a lightweight, extensible script execution e
 
 ```toml
 [dependencies]
-win-auto-utils = { version = "0.2.3", features = ["script_engine"] }
+win-auto-utils = { version = "0.2.6", features = ["script_engine"] }
 ```
 
 **Platform**: Cross-platform (pure Rust implementation)

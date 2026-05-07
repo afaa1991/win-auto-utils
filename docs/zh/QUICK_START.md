@@ -1,4 +1,4 @@
-# 快速开始指南 - 找到你需要的文档
+﻿# 快速开始指南 - 找到你需要的文档
 
 [English Version](../en/QUICK_START.md)
 

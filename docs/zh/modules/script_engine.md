@@ -1,4 +1,4 @@
-# 脚本引擎 (Script Engine)
+﻿# 脚本引擎 (Script Engine)
 
 [English](../../en/modules/script_engine.md) | [返回概览](overview.md)
 
@@ -8,7 +8,7 @@
 
 ```toml
 [dependencies]
-win-auto-utils = { version = "0.2.3", features = ["script_engine"] }
+win-auto-utils = { version = "0.2.6", features = ["script_engine"] }
 ```
 
 **平台**: 跨平台（纯 Rust 实现）

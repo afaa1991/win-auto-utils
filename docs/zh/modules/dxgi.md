@@ -1,4 +1,4 @@
-# DXGI 屏幕捕获 (DXGI Screen Capture)
+﻿# DXGI 屏幕捕获 (DXGI Screen Capture)
 
 [English](../../en/modules/dxgi.md) | [返回概览](overview.md)
 
@@ -8,7 +8,7 @@
 
 ```toml
 [dependencies]
-win-auto-utils = { version = "0.2.3", features = ["dxgi"] }
+win-auto-utils = { version = "0.2.6", features = ["dxgi"] }
 ```
 
 **平台**: 仅 Windows（需要 DirectX 11+）

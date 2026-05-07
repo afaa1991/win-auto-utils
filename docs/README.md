@@ -1,4 +1,4 @@
-# Win Auto Utils Documentation
+﻿# Win Auto Utils Documentation
 
 [English](en/INDEX.md) | [中文](zh/INDEX.md)
 

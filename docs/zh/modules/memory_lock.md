@@ -1,4 +1,4 @@
-# 内存锁定模块 (Memory Lock)
+﻿# 内存锁定模块 (Memory Lock)
 
 [English](../../en/modules/memory_lock.md) | [返回概览](overview.md)
 

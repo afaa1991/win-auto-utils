@@ -1,4 +1,4 @@
-# Process & Window Management
+﻿# Process & Window Management
 
 [中文文档](../../zh/modules/process_window.md) | [Back to Overview](overview.md)
 
@@ -8,7 +8,7 @@ The `process` module provides comprehensive process and window management with a
 
 ```toml
 [dependencies]
-win-auto-utils = { version = "0.2.3", features = ["process"] }
+win-auto-utils = { version = "0.2.6", features = ["process"] }
 ```
 
 ## Quick Start

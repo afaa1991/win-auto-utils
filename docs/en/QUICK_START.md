@@ -1,4 +1,4 @@
-# Quick Start Guide - Finding the Right Documentation
+﻿# Quick Start Guide - Finding the Right Documentation
 
 [中文版本](../zh/QUICK_START.md)
 

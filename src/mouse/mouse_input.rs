@@ -177,6 +177,31 @@ pub fn build_click_middle_at(x: i32, y: i32) -> Vec<INPUT> {
     ]
 }
 
+/// Build double left click INPUT sequence at current position (parse-time)
+#[inline]
+pub fn build_double_click_left() -> Vec<INPUT> {
+    vec![
+        build_mouse_input(MOUSEEVENTF_LEFTDOWN, 0, 0, 0),
+        build_mouse_input(MOUSEEVENTF_LEFTUP, 0, 0, 0),
+        build_mouse_input(MOUSEEVENTF_LEFTDOWN, 0, 0, 0),
+        build_mouse_input(MOUSEEVENTF_LEFTUP, 0, 0, 0),
+    ]
+}
+
+/// Build double left click INPUT sequence at specified coordinates (parse-time)
+#[inline]
+pub fn build_double_click_left_at(x: i32, y: i32) -> Vec<INPUT> {
+    let (nx, ny) = normalize_coords(x, y);
+
+    vec![
+        build_mouse_input(MOUSEEVENTF_MOVE | MOUSEEVENTF_ABSOLUTE, nx, ny, 0),
+        build_mouse_input(MOUSEEVENTF_LEFTDOWN, 0, 0, 0),
+        build_mouse_input(MOUSEEVENTF_LEFTUP, 0, 0, 0),
+        build_mouse_input(MOUSEEVENTF_LEFTDOWN, 0, 0, 0),
+        build_mouse_input(MOUSEEVENTF_LEFTUP, 0, 0, 0),
+    ]
+}
+
 /// Build press left button INPUT (parse-time)
 #[inline]
 pub fn build_press_left() -> INPUT {
@@ -332,6 +357,18 @@ impl SendInputMouse {
     /// Click middle button at specified coordinates
     pub fn click_middle_at(&self, x: i32, y: i32) -> Result<(), SendMouseInputError> {
         let inputs = build_click_middle_at(x, y);
+        execute_inputs(&inputs)
+    }
+
+    /// Double click left button at current position
+    pub fn double_click_left(&self) -> Result<(), SendMouseInputError> {
+        let inputs = build_double_click_left();
+        execute_inputs(&inputs)
+    }
+
+    /// Double click left button at specified coordinates
+    pub fn double_click_left_at(&self, x: i32, y: i32) -> Result<(), SendMouseInputError> {
+        let inputs = build_double_click_left_at(x, y);
         execute_inputs(&inputs)
     }
 

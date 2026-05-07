@@ -1,4 +1,4 @@
-# 核心模块概览
+﻿# 核心模块概览
 
 [English](../../en/modules/overview.md) | [返回 README](../../../docs/zh/README.md)
 

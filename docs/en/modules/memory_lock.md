@@ -1,4 +1,4 @@
-# Memory Lock Module
+﻿# Memory Lock Module
 
 [中文文档](../../zh/modules/memory_lock.md) | [Back to Overview](overview.md)
 

@@ -1,4 +1,4 @@
-# Memory Manager Module
+﻿# Memory Manager Module
 
 [中文文档](../../zh/modules/memory_manager.md) | [Back to Overview](overview.md)
 

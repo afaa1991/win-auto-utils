@@ -1,4 +1,4 @@
-# DXGI Screen Capture
+﻿# DXGI Screen Capture
 
 [中文文档](../../zh/modules/dxgi.md) | [Back to Overview](overview.md)
 
@@ -8,7 +8,7 @@ The `dxgi` module provides ultra-high-performance screen capture using Windows D
 
 ```toml
 [dependencies]
-win-auto-utils = { version = "0.2.3", features = ["dxgi"] }
+win-auto-utils = { version = "0.2.6", features = ["dxgi"] }
 ```
 
 **Platform**: Windows only (requires DirectX 11+)

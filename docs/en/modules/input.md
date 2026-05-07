@@ -1,4 +1,4 @@
-# Input Control (Keyboard & Mouse)
+﻿# Input Control (Keyboard & Mouse)
 
 [中文文档](../../zh/modules/input.md) | [Back to Overview](overview.md)
 
@@ -8,7 +8,7 @@ The `input` module provides comprehensive keyboard and mouse control through two
 
 ```toml
 [dependencies]
-win-auto-utils = { version = "0.2.3", features = ["keyboard", "mouse"] }
+win-auto-utils = { version = "0.2.6", features = ["keyboard", "mouse"] }
 ```
 
 ## Quick Start
@@ -237,6 +237,161 @@ for _ in 0..10 {
 | `"ctrl"` / `"alt"` / `"shift"` | Modifiers | VK_CONTROL, etc. |
 | `"win"` | Windows key | VK_LWIN |
 | `"caps"` | Caps Lock | VK_CAPITAL |
+
+## Script Instructions
+
+The `scripts_builtin` module provides high-level mouse and keyboard instructions for the script engine.
+
+### Mouse Instructions
+
+#### `click` - Mouse Click
+
+Perform a mouse click at specified or current position.
+
+**Syntax**: `click [x] [y] [delay_ms]`
+
+**Parameters**:
+- `x` (optional): X coordinate. If omitted, clicks at current position
+- `y` (optional): Y coordinate. Required if x is provided
+- `delay_ms` (optional): Milliseconds to wait between press and release. Default is 0
+
+**Examples**:
+```text
+click                      # Click at current position
+click 100 200              # Click at screen coordinates (100, 200)
+click 50 50 100            # Click at (50, 50) with 100ms delay
+```
+
+**Coordinate System**:
+- Without hwnd: Uses absolute screen coordinates
+- With hwnd set: Uses window-relative coordinates, automatically converted to screen coordinates
+
+#### `dbclick` - Mouse Double-click
+
+Perform a double-click operation.
+
+**Syntax**: `dbclick [x] [y] [delay_ms]`
+
+**Parameters**:
+- `x` (optional): X coordinate
+- `y` (optional): Y coordinate
+- `delay_ms` (optional): Delay after the second click
+
+**Examples**:
+```text
+dbclick                    # Double-click at current position
+dbclick 100 200            # Double-click at (100, 200)
+```
+
+#### `move` - Move Mouse to Absolute Position
+
+**Syntax**: `move <x> <y>`
+
+**Examples**:
+```text
+move 500 300               # Move to screen coordinates (500, 300)
+```
+
+#### `moverel` - Relative Movement
+
+**Syntax**: `moverel <dx> <dy>`
+
+**Examples**:
+```text
+moverel 10 -5              # Move 10px right, 5px up
+```
+
+#### `scrollup` / `scrolldown` - Scroll Wheel
+
+**Syntax**: `scrollup [x] [y] [times]`
+
+**Examples**:
+```text
+scrollup                   # Scroll up 1 notch at current position
+scrollup 3                 # Scroll up 3 notches
+scrollup 100 200           # Move to (100, 200) then scroll up
+```
+
+#### `press` / `release` - Press/Release Mouse Button
+
+**Syntax**: `press` / `release`
+
+**Examples**:
+```text
+press                      # Press and hold left button
+release                    # Release left button
+```
+
+### Keyboard Instructions
+
+#### `key` - Key Click
+
+Perform a complete key click (press followed by release).
+
+**Syntax**: `key <key_name> [delay_ms] [mode]`
+
+**Parameters**:
+- `key_name`: Key name (e.g., "A", "ENTER", "CTRL")
+- `delay_ms` (optional): Milliseconds to wait between press and release. Default is 0
+- `mode` (optional): Execution mode, `send` (foreground, default) or `post` (background)
+
+**Examples**:
+```text
+key A                      # Click 'A' in foreground (default)
+key ENTER 50               # Click ENTER with 50ms delay in foreground
+key A post                 # Click 'A' in background
+key A 50 post              # Click 'A' with 50ms delay in background
+```
+
+#### `key_down` - Press and Hold Key
+
+**Syntax**: `key_down <key_name> [mode]`
+
+**Examples**:
+```text
+key_down CONTROL           # Press CONTROL in foreground
+key_down SHIFT post        # Press SHIFT in background
+```
+
+#### `key_up` - Release Key
+
+**Syntax**: `key_up <key_name> [mode]`
+
+**Examples**:
+```text
+key_up CONTROL             # Release CONTROL in foreground
+key_up SHIFT post          # Release SHIFT in background
+```
+
+#### Key Combination Examples
+
+```text
+# Ctrl+C (Copy)
+key_down CONTROL
+key C
+key_up CONTROL
+
+# Alt+Tab (Switch windows)
+key_down ALT
+key TAB
+key_up ALT
+```
+
+#### Background Mode Setup
+
+Before using `post` mode, you must set the target window handle in your Rust code:
+
+```rust
+use win_auto_utils::script_engine::ScriptEngine;
+use windows::Win32::Foundation::HWND;
+
+let engine = ScriptEngine::with_builtin();
+
+// Set target window
+engine.compile_and_execute_with_context("key A post", |ctx| {
+    ctx.set_persistent_state("target_hwnd", HWND(window_handle));
+}).unwrap();
+```
 
 ## Best Practices
 

@@ -1,4 +1,4 @@
-# 进程与窗口管理
+﻿# 进程与窗口管理
 
 [English](../../en/modules/process_window.md) | [返回概览](overview.md)
 
@@ -8,7 +8,7 @@
 
 ```toml
 [dependencies]
-win-auto-utils = { version = "0.2.3", features = ["process"] }
+win-auto-utils = { version = "0.2.6", features = ["process"] }
 ```
 
 ## 快速开始

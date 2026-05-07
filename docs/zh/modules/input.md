@@ -1,4 +1,4 @@
-# 输入控制 (Input Control - Keyboard & Mouse)
+﻿# 输入控制 (Input Control - Keyboard & Mouse)
 
 [English](../../en/modules/input.md) | [返回概览](overview.md)
 
@@ -8,7 +8,7 @@
 
 ```toml
 [dependencies]
-win-auto-utils = { version = "0.2.3", features = ["keyboard", "mouse"] }
+win-auto-utils = { version = "0.2.6", features = ["keyboard", "mouse"] }
 ```
 
 ## 快速开始
@@ -237,6 +237,161 @@ for _ in 0..10 {
 | `"ctrl"` / `"alt"` / `"shift"` | 修饰键 | VK_CONTROL 等 |
 | `"win"` | Windows 键 | VK_LWIN |
 | `"caps"` | 大写锁定 | VK_CAPITAL |
+
+## 脚本指令 (Script Instructions)
+
+`scripts_builtin` 模块提供了用于脚本引擎的高级鼠标和键盘指令。
+
+### Mouse 指令
+
+#### `click` - 鼠标点击
+
+在指定位置或当前位置执行鼠标点击。
+
+**语法**: `click [x] [y] [delay_ms]`
+
+**参数**:
+- `x` (可选): X 坐标，如果省略则在当前位置点击
+- `y` (可选): Y 坐标，提供 x 时必须提供
+- `delay_ms` (可选): 按下和释放之间的延迟（毫秒），默认为 0
+
+**示例**:
+```text
+click                      # 在当前位置点击
+click 100 200              # 在屏幕坐标 (100, 200) 点击
+click 50 50 100            # 在 (50, 50) 点击，延迟 100ms
+```
+
+**坐标系统**:
+- 无 hwnd 时：使用绝对屏幕坐标
+- 设置 hwnd 后：使用窗口相对坐标，自动转换为屏幕坐标
+
+#### `dbclick` - 鼠标双击
+
+执行鼠标双击操作。
+
+**语法**: `dbclick [x] [y] [delay_ms]`
+
+**参数**:
+- `x` (可选): X 坐标
+- `y` (可选): Y 坐标
+- `delay_ms` (可选): 第二次点击后的延迟
+
+**示例**:
+```text
+dbclick                    # 在当前位置双击
+dbclick 100 200            # 在 (100, 200) 双击
+```
+
+#### `move` - 移动鼠标到绝对位置
+
+**语法**: `move <x> <y>`
+
+**示例**:
+```text
+move 500 300               # 移动到屏幕坐标 (500, 300)
+```
+
+#### `moverel` - 相对移动
+
+**语法**: `moverel <dx> <dy>`
+
+**示例**:
+```text
+moverel 10 -5              # 向右移动 10px，向上移动 5px
+```
+
+#### `scrollup` / `scrolldown` - 滚轮滚动
+
+**语法**: `scrollup [x] [y] [times]`
+
+**示例**:
+```text
+scrollup                   # 在当前位置向上滚动 1 格
+scrollup 3                 # 向上滚动 3 格
+scrollup 100 200           # 移动到 (100, 200) 后向上滚动
+```
+
+#### `press` / `release` - 按下/释放鼠标按钮
+
+**语法**: `press` / `release`
+
+**示例**:
+```text
+press                      # 按下左键并保持
+release                    # 释放左键
+```
+
+### Keyboard 指令
+
+#### `key` - 按键点击
+
+执行完整的按键操作（按下 + 释放）。
+
+**语法**: `key <key_name> [delay_ms] [mode]`
+
+**参数**:
+- `key_name`: 按键名称（如 "A", "ENTER", "CTRL"）
+- `delay_ms` (可选): 按下和释放之间的延迟（毫秒），默认为 0
+- `mode` (可选): 执行模式，`send`（前台，默认）或 `post`（后台）
+
+**示例**:
+```text
+key A                      # 前台点击 'A' 键（默认）
+key ENTER 50               # 前台点击 ENTER，延迟 50ms
+key A post                 # 后台点击 'A' 键
+key A 50 post              # 后台点击 'A'，延迟 50ms
+```
+
+#### `key_down` - 按下并保持按键
+
+**语法**: `key_down <key_name> [mode]`
+
+**示例**:
+```text
+key_down CONTROL           # 前台按下 CONTROL
+key_down SHIFT post        # 后台按下 SHIFT
+```
+
+#### `key_up` - 释放按键
+
+**语法**: `key_up <key_name> [mode]`
+
+**示例**:
+```text
+key_up CONTROL             # 前台释放 CONTROL
+key_up SHIFT post          # 后台释放 SHIFT
+```
+
+#### 组合键示例
+
+```text
+# Ctrl+C（复制）
+key_down CONTROL
+key C
+key_up CONTROL
+
+# Alt+Tab（切换窗口）
+key_down ALT
+key TAB
+key_up ALT
+```
+
+#### 后台模式配置
+
+使用 `post` 模式前，需要在 Rust 代码中设置目标窗口句柄：
+
+```rust
+use win_auto_utils::script_engine::ScriptEngine;
+use windows::Win32::Foundation::HWND;
+
+let engine = ScriptEngine::with_builtin();
+
+// 设置目标窗口
+engine.compile_and_execute_with_context("key A post", |ctx| {
+    ctx.set_persistent_state("target_hwnd", HWND(window_handle));
+}).unwrap();
+```
 
 ## 最佳实践
 

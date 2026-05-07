@@ -1,4 +1,4 @@
-# 内存操作 (Memory Operations)
+﻿# 内存操作 (Memory Operations)
 
 [English](../../en/modules/memory.md) | [返回概览](overview.md)
 
@@ -10,7 +10,7 @@
 
 ```toml
 [dependencies]
-win-auto-utils = { version = "0.2.3", features = ["memory"] }
+win-auto-utils = { version = "0.2.6", features = ["memory"] }
 ```
 
 ## 快速开始

@@ -1,4 +1,4 @@
-# Memory Hook Module
+﻿# Memory Hook Module
 
 [中文文档](../../zh/modules/memory_hook.md) | [Back to Overview](overview.md)
 

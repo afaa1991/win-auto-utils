@@ -1,4 +1,4 @@
-# Documentation Structure Guide
+﻿# Documentation Structure Guide
 
 This document explains the documentation structure and how to maintain it.
 

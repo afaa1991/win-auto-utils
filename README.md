@@ -33,14 +33,14 @@ Add to your `Cargo.toml`:
 
 ```toml
 [dependencies]
-win-auto-utils = { version = "0.2.3", features = ["standard"] }
+win-auto-utils = { version = "0.2.6", features = ["standard"] }
 ```
 
 For full functionality including template matching:
 
 ```toml
 [dependencies]
-win-auto-utils = { version = "0.2.3", features = ["full"] }
+win-auto-utils = { version = "0.2.6", features = ["full"] }
 ```
 
 ## 🎯 Quick Start

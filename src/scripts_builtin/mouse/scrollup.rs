@@ -1,62 +1,53 @@
 //! Mouse scroll up instruction handler
 //!
 //! Implements the `scrollup` instruction for scrolling the mouse wheel upward.
+//!
+//! # Execution Behavior
+//! Moves cursor to (x, y) if coordinates provided, then scrolls the wheel up by the specified number of notches.
+//! Each notch scrolls 120 units (one "line" by Windows conventions).
+//!
+//! # Coordinate System
+//!
+//! - **Without hwnd**: Coordinates are absolute screen coordinates
+//! - **With hwnd set**: Coordinates are window-relative, converted to screen coordinates by adding window_left and window_top
+//!
+//! # Syntax
+//! ```text
+//! scrollup [x] [y] [times]
+//! ```
+//!
+//! # Arguments
+//! - `x` (optional): X coordinate to move cursor before scrolling
+//! - `y` (optional): Y coordinate to move cursor before scrolling
+//! - `times` (optional): Number of notches to scroll. Default is 1. Valid range: 1-100
+//!
+//! # Examples
+//! ```text
+//! scrollup                    # Scroll up 1 notch at current position
+//! scrollup 3                  # Scroll up 3 notches at current position
+//! scrollup 100 200            # Move to (100, 200) then scroll up 1 notch
+//! scrollup 100 200 5          # Move to (100, 200) then scroll up 5 notches
+//! ```
+//!
+//! # Errors
+//! - Negative coordinates are rejected during parse
+//! - Times must be between 1 and 100
 
-use super::{parse_mouse_mode, MouseMode, ScrollParams};
 use crate::mouse::mouse_input;
 use crate::script_engine::instruction::{
     InstructionData, InstructionHandler, InstructionMetadata, ScriptError,
 };
 use crate::script_engine::VMContext;
+use windows::Win32::UI::Input::KeyboardAndMouse::INPUT;
 
-/// Mouse scroll up handler
-///
-/// Syntax: `scrollup [x] [y] [times] [mode]`
-/// Scrolls the mouse wheel upward by a specified number of times (each time = 120 units = one notch)
-/// Coordinates are optional - if omitted, uses current position for SendInput mode
-///
-/// # Parameters
-/// - `[x] [y]`: Optional coordinates for target position
-/// - `[times]`: Number of scroll notches (default: 1, range: 1-100)
-/// - `[mode]`: Operation mode (send/post)
-///
-/// # Mode Priority
-/// The effective mode is determined by the following priority (highest to lowest):
-/// 1. Explicit mode in instruction (e.g., `scrollup post`)
-/// 2. VM context `input_mode` setting (via `ctx.set_persistent_state(context_keys::INPUT_MODE, "post")`)
-/// 3. Hardcoded default (`Send`)
-///
-/// # Examples
-/// ```text
-/// scrollup                   # Scroll up 1 notch at current position
-/// scrollup 3                 # Scroll up 3 notches at current position
-/// scrollup 100 200 5         # Scroll up 5 notches at (100, 200)
-/// scrollup 100 200 3 post    # Scroll up 3 notches at (100, 200) in background
-/// ```
-///
-/// # Setting Target Window for PostMessage Mode
-/// Before using PostMessage mode, set the target window handle:
-/// ```rust,no_run
-/// use win_auto_utils::scripts_builtin::context_keys;
-/// # let hwnd = 0u32 as windows::Win32::Foundation::HWND;
-/// # let mut vm = win_auto_utils::script_engine::vm::VMContext::new();
-/// context_keys::set_vmcontext_hwnd(&mut vm, hwnd);
-/// ```
-///
-/// # Error Messages
-///
-/// ```text
-/// scrollup abc               → "Invalid times 'abc': ..."
-/// scrollup 100 200 abc       → "Invalid times 'abc': ..."
-/// scrollup 100 200 0         → "Scroll times must be between 1 and 100"
-/// ```
-///
-/// # Notes
-/// - PostMessage mode requires target_hwnd to be set in VM state
-/// - Without coordinates in PostMessage mode, defaults to (0, 0)
-/// - PostMessage scroll does NOT move the actual mouse cursor
-/// - Each scroll notch = 120 units (Windows standard)
-/// - Times parameter controls how many notches to scroll (more intuitive than distance)
+#[derive(Clone)]
+pub struct ScrollParams {
+    pub x: Option<i32>,
+    pub y: Option<i32>,
+    pub times: u32,
+    pub scroll_input: INPUT,
+}
+
 pub struct ScrollUpHandler;
 
 impl InstructionHandler for ScrollUpHandler {
@@ -66,93 +57,109 @@ impl InstructionHandler for ScrollUpHandler {
 
     #[inline]
     fn parse(&self, args: &[&str]) -> Result<InstructionData, ScriptError> {
-        let (mode, mode_offset) = parse_mouse_mode(args, MouseMode::Send)?;
-        let value_args = &args[..args.len() - mode_offset];
+        let mut x: Option<i32> = None;
+        let mut y: Option<i32> = None;
+        let mut times: u32 = 1;
 
-        // Parse coordinates and times
-        let (x, y, times) = match value_args.len() {
-            0 => (None, None, 1), // Default: 1 notch at current position
+        match args.len() {
+            0 => {}
             1 => {
-                // Could be times only
-                let times = value_args[0].parse::<u32>().map_err(|e| {
-                    ScriptError::ParseError(format!("Invalid times '{}': {}", value_args[0], e))
-                })?;
-                if times < 1 || times > 100 {
+                if let Ok(val) = args[0].parse::<u32>() {
+                    times = val;
+                } else if let Ok(val) = args[0].parse::<i32>() {
+                    if val >= 0 {
+                        times = val as u32;
+                    } else {
+                        return Err(ScriptError::ParseError(
+                            "Scroll times must be positive".into(),
+                        ));
+                    }
+                } else {
                     return Err(ScriptError::ParseError(
-                        "Scroll times must be between 1 and 100".into(),
+                        format!("Invalid argument '{}'. Expected: scrollup [x] [y] [times]", args[0]).into(),
                     ));
                 }
-                (None, None, times)
             }
             2 => {
-                // Could be x y or x times - assume x y for backward compatibility
-                let x = value_args[0].parse::<i32>().map_err(|e| {
-                    ScriptError::ParseError(format!(
-                        "Invalid x coordinate '{}': {}",
-                        value_args[0], e
-                    ))
-                })?;
-                let y = value_args[1].parse::<i32>().map_err(|e| {
-                    ScriptError::ParseError(format!(
-                        "Invalid y coordinate '{}': {}",
-                        value_args[1], e
-                    ))
-                })?;
-                (Some(x), Some(y), 1)
-            }
-            3 => {
-                // x y times
-                let x = value_args[0].parse::<i32>().map_err(|e| {
-                    ScriptError::ParseError(format!(
-                        "Invalid x coordinate '{}': {}",
-                        value_args[0], e
-                    ))
-                })?;
-                let y = value_args[1].parse::<i32>().map_err(|e| {
-                    ScriptError::ParseError(format!(
-                        "Invalid y coordinate '{}': {}",
-                        value_args[1], e
-                    ))
-                })?;
-                let times = value_args[2].parse::<u32>().map_err(|e| {
-                    ScriptError::ParseError(format!("Invalid times '{}': {}", value_args[2], e))
-                })?;
-                if times < 1 || times > 100 {
+                if let Ok(val) = args[0].parse::<i32>() {
+                    if val < 0 {
+                        return Err(ScriptError::ParseError(
+                            format!("Coordinates cannot be negative: {}", val).into(),
+                        ));
+                    }
+                    x = Some(val);
+                } else {
                     return Err(ScriptError::ParseError(
-                        "Scroll times must be between 1 and 100".into(),
+                        format!("Invalid argument '{}'. Expected: scrollup [x] [y] [times]", args[0]).into(),
                     ));
                 }
-                (Some(x), Some(y), times)
+                if let Ok(val) = args[1].parse::<i32>() {
+                    if val < 0 {
+                        return Err(ScriptError::ParseError(
+                            format!("Coordinates cannot be negative: {}", val).into(),
+                        ));
+                    }
+                    y = Some(val);
+                } else {
+                    return Err(ScriptError::ParseError(
+                        format!("Invalid argument '{}'. Expected: scrollup [x] [y] [times]", args[1]).into(),
+                    ));
+                }
             }
             _ => {
-                return Err(ScriptError::ParseError(
-                    "Invalid number of arguments. Usage: scrollup [x] [y] [times] [mode]".into(),
-                ));
+                if let Ok(val) = args[0].parse::<i32>() {
+                    if val < 0 {
+                        return Err(ScriptError::ParseError(
+                            format!("Coordinates cannot be negative: {}", val).into(),
+                        ));
+                    }
+                    x = Some(val);
+                } else {
+                    return Err(ScriptError::ParseError(
+                        format!("Invalid argument '{}'. Expected: scrollup [x] [y] [times]", args[0]).into(),
+                    ));
+                }
+                if let Ok(val) = args[1].parse::<i32>() {
+                    if val < 0 {
+                        return Err(ScriptError::ParseError(
+                            format!("Coordinates cannot be negative: {}", val).into(),
+                        ));
+                    }
+                    y = Some(val);
+                } else {
+                    return Err(ScriptError::ParseError(
+                        format!("Invalid argument '{}'. Expected: scrollup [x] [y] [times]", args[1]).into(),
+                    ));
+                }
+                if let Ok(val) = args[2].parse::<u32>() {
+                    times = val;
+                } else if let Ok(val) = args[2].parse::<i32>() {
+                    if val >= 0 {
+                        times = val as u32;
+                    }
+                }
             }
-        };
-
-        // Validate PostMessage mode requires coordinates if provided
-        if mode == MouseMode::Post && x.is_some() && y.is_none() {
-            return Err(ScriptError::ParseError(
-                "PostMessage scroll requires both x and y coordinates".into(),
-            ));
         }
 
-        // OPTIMIZATION: Pre-build SINGLE SCROLL INPUT at parse time (delta=120 fixed)
-        // Execute phase will loop N times to achieve N notches - zero runtime construction!
-        let send_inputs = if mode == MouseMode::Send {
-            vec![mouse_input::build_scroll_up(120)] // Fixed delta, pre-built once
-        } else {
-            vec![]
-        };
+        if let (Some(x_val), Some(y_val)) = (x, y) {
+            if x_val < 0 || y_val < 0 {
+                return Err(ScriptError::ParseError(
+                    format!("Coordinates cannot be negative: ({}, {})", x_val, y_val).into(),
+                ));
+            }
+        }
+
+        if times < 1 || times > 100 {
+            return Err(ScriptError::ParseError(
+                "Scroll times must be between 1 and 100".into(),
+            ));
+        }
 
         Ok(InstructionData::Custom(Box::new(ScrollParams {
             x,
             y,
-            delta: times as i32, // Reuse delta field to store times count
-            mode,
-            mode_specified: mode_offset > 0,
-            send_inputs,
+            times,
+            scroll_input: mouse_input::build_scroll_up(120),
         })))
     }
 
@@ -165,91 +172,22 @@ impl InstructionHandler for ScrollUpHandler {
     ) -> Result<(), ScriptError> {
         let params = data.extract_custom::<ScrollParams>("Invalid scroll parameters")?;
 
-        // Determine effective mode with priority: explicit > input_mode from VM > hardcoded default
-        let effective_mode = if params.mode_specified {
-            params.mode
-        } else {
-            match super::get_input_mode(vm).as_str() {
-                "post" => MouseMode::Post,
-                _ => MouseMode::Send,
-            }
-        };
+        if let (Some(x), Some(y)) = (params.x, params.y) {
+            // Apply window offset if window geometry is available
+            let (screen_x, screen_y) = match vm.process.window_geometry {
+                Some(geo) => (x + geo.window_left, y + geo.window_top),
+                None => (x, y),
+            };
 
-        match effective_mode {
-            MouseMode::Send => {
-                // Pre-extract window offset to avoid closure error propagation issues
-                let screen_coords = if let (Some(x), Some(y)) = (params.x, params.y) {
-                    #[cfg(feature = "script_process_context")]
-                    {
-                        if vm.process.has_hwnd() {
-                            Some(super::convert_to_window_coords(vm, x, y)?)
-                        } else {
-                            Some((x, y))
-                        }
-                    }
+            mouse_input::set_cursor_pos(screen_x, screen_y).map_err(|e| {
+                ScriptError::ExecutionError(format!("SetCursorPos failed: {:?}", e))
+            })?;
+        }
 
-                    #[cfg(not(feature = "script_process_context"))]
-                    {
-                        // Without process_context feature, coordinates are treated as screen coordinates
-                        Some((x, y))
-                    }
-                } else {
-                    None
-                };
-
-                // OPTIMIZATION: Use SetCursorPos for movement + pre-built scroll for execution
-                if let Some((screen_x, screen_y)) = screen_coords {
-                    mouse_input::set_cursor_pos(screen_x, screen_y).map_err(|e| {
-                        ScriptError::ExecutionError(format!("SetCursorPos failed: {:?}", e))
-                    })?;
-
-                    // Execute pre-built scroll INPUT N times (zero construction overhead)
-                    for _ in 0..params.delta {
-                        mouse_input::execute_inputs(&params.send_inputs).map_err(|e| {
-                            ScriptError::ExecutionError(format!("Scroll up failed: {:?}", e))
-                        })?;
-                    }
-                } else {
-                    // No coordinates: execute pre-built scroll at current position N times
-                    for _ in 0..params.delta {
-                        mouse_input::execute_inputs(&params.send_inputs).map_err(|e| {
-                            ScriptError::ExecutionError(format!("Scroll up failed: {:?}", e))
-                        })?;
-                    }
-                }
-            }
-            MouseMode::Post => {
-                #[cfg(feature = "script_process_context")]
-                {
-                    use crate::mouse::mouse_message;
-
-                    // Use provided coordinates or default to (0, 0)
-                    let window_x = params.x.unwrap_or(0);
-                    let window_y = params.y.unwrap_or(0);
-                    // Convert window coordinates to client coordinates for PostMessage
-                    let (client_x, client_y) =
-                        super::convert_to_client_coords(vm, window_x, window_y)?;
-                    // Execute scroll N times for PostMessage mode
-                    for _ in 0..params.delta {
-                        mouse_message::post_scroll_up_atomic(
-                            vm.process.get_hwnd_or_err()?,
-                            client_x,
-                            client_y,
-                            120,
-                        );
-                    }
-                }
-
-                #[cfg(not(feature = "script_process_context"))]
-                {
-                    return Err(ScriptError::ExecutionError(
-                        "PostMessage mode requires 'script_process_context' feature. \
-                         Enable it in Cargo.toml: features = [\"scripts_mouse_with_post\"] \
-                         or use SendInput mode (default)."
-                            .into(),
-                    ));
-                }
-            }
+        for _ in 0..params.times {
+            mouse_input::execute_single_input(&params.scroll_input).map_err(|e| {
+                ScriptError::ExecutionError(format!("Scroll up failed: {:?}", e))
+            })?;
         }
 
         Ok(())

@@ -1,4 +1,4 @@
-# 内存管理器模块 (Memory Manager)
+﻿# 内存管理器模块 (Memory Manager)
 
 [English](../../en/modules/memory_manager.md) | [返回概览](overview.md)
 

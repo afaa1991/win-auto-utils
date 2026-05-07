@@ -436,6 +436,106 @@ impl ScriptEngine {
         let script = self.compile(text)?;
         self.execute_with_context_and_interrupt(&script, setup_fn, interrupt)
     }
+
+    /// Execute compiled script repeatedly in an infinite loop until interrupted
+    ///
+    /// This method runs the compiled script in an infinite loop, automatically
+    /// resetting execution state between iterations. It can be interrupted either:
+    /// 1. During script execution (via interrupt check in VM loop)
+    /// 2. Between iterations (before starting next iteration)
+    ///
+    /// # Use Cases
+    /// - Long-running automation tasks that need to run until manually stopped
+    /// - Background monitoring scripts
+    /// - Continuous polling operations
+    /// - Hotkey-triggered repeated actions
+    ///
+    /// # Example
+    /// ```no_run
+    /// use win_auto_utils::script_engine::{InterruptController, ScriptEngine};
+    ///
+    /// let engine = ScriptEngine::with_builtin();
+    /// let interrupt = InterruptController::new();
+    /// let script = engine.compile("key A\nsleep 100")?;
+    ///
+    /// // Run in background thread
+    /// std::thread::spawn(move || {
+    ///     engine.execute_loop(&script, &interrupt).unwrap();
+    /// });
+    ///
+    /// // Later, stop the loop
+    /// interrupt.request_interrupt();
+    /// ```
+    pub fn execute_loop(
+        &self,
+        script: &CompiledScript,
+        interrupt: &InterruptController,
+    ) -> Result<(), ScriptError> {
+        loop {
+            // Check for interrupt before starting each iteration
+            if interrupt.is_interrupted() {
+                return Err(ScriptError::Interrupted(
+                    "Script execution interrupted by user".into(),
+                ));
+            }
+
+            // Execute one iteration with interrupt control
+            self.execute_with_interrupt(script, interrupt)?;
+        }
+    }
+
+    /// Compile and execute script repeatedly in an infinite loop until interrupted
+    ///
+    /// This is a convenience method that combines compilation and loop execution.
+    pub fn compile_and_execute_loop(
+        &self,
+        text: &str,
+        interrupt: &InterruptController,
+    ) -> Result<(), ScriptError> {
+        let script = self.compile(text)?;
+        self.execute_loop(&script, interrupt)
+    }
+
+    /// Execute compiled script repeatedly with custom context and interrupt control
+    ///
+    /// Similar to `execute_loop` but allows injecting custom context before each iteration.
+    pub fn execute_loop_with_context<F>(
+        &self,
+        script: &CompiledScript,
+        setup_fn: F,
+        interrupt: &InterruptController,
+    ) -> Result<(), ScriptError>
+    where
+        F: Fn(&mut super::vm::VMContext),
+    {
+        loop {
+            // Check for interrupt before starting each iteration
+            if interrupt.is_interrupted() {
+                return Err(ScriptError::Interrupted(
+                    "Script execution interrupted by user".into(),
+                ));
+            }
+
+            // Execute one iteration with context and interrupt control
+            let mut vm = VM::new_with_interrupt(self.config.vm.clone(), &self.registry, interrupt.get_flag());
+            setup_fn(vm.get_context_mut());
+            vm.execute(script)?;
+        }
+    }
+
+    /// Compile and execute script repeatedly with custom context and interrupt control
+    pub fn compile_and_execute_loop_with_context<F>(
+        &self,
+        text: &str,
+        setup_fn: F,
+        interrupt: &InterruptController,
+    ) -> Result<(), ScriptError>
+    where
+        F: Fn(&mut super::vm::VMContext),
+    {
+        let script = self.compile(text)?;
+        self.execute_loop_with_context(&script, setup_fn, interrupt)
+    }
 }
 
 #[cfg(test)]

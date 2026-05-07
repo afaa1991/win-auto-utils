@@ -1,4 +1,4 @@
-# Template Matcher (Image Template Matching)
+﻿# Template Matcher (Image Template Matching)
 
 [中文文档](../../zh/modules/template_matcher.md) | [Back to Overview](overview.md)
 
@@ -8,7 +8,7 @@ The `template_matcher` module provides high-performance image template matching 
 
 ```toml
 [dependencies]
-win-auto-utils = { version = "0.2.3", features = ["template_matcher"] }
+win-auto-utils = { version = "0.2.6", features = ["template_matcher"] }
 ```
 
 **Platform**: Windows only (requires DXGI support)

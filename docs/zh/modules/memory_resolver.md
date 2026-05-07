@@ -1,4 +1,4 @@
-# 内存地址解析器 (Memory Address Resolver)
+﻿# 内存地址解析器 (Memory Address Resolver)
 
 [English](../../en/modules/memory_resolver.md) | [返回概览](overview.md)
 
@@ -8,7 +8,7 @@
 
 ```toml
 [dependencies]
-win-auto-utils = { version = "0.2.3", features = ["memory_resolver"] }
+win-auto-utils = { version = "0.2.6", features = ["memory_resolver"] }
 ```
 
 ## 快速开始

@@ -1,4 +1,4 @@
-# Win Auto Utils
+﻿# Win Auto Utils
 
 [English Documentation](../README.md) | [英文文档](../README.md)
 
@@ -33,14 +33,14 @@
 
 ```
 [dependencies]
-win-auto-utils = { version = "0.2.3", features = ["standard"] }
+win-auto-utils = { version = "0.2.6", features = ["standard"] }
 ```
 
 如需包含模板匹配等完整功能：
 
 ```
 [dependencies]
-win-auto-utils = { version = "0.2.3", features = ["full"] }
+win-auto-utils = { version = "0.2.6", features = ["full"] }
 ```
 
 ## 🎯 快速开始

@@ -1,4 +1,4 @@
-# 内存钩子模块 (Memory Hook)
+﻿# 内存钩子模块 (Memory Hook)
 
 [English](../../en/modules/memory_hook.md) | [返回概览](overview.md)
 
